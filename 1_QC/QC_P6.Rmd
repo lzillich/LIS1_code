@@ -1,0 +1,126 @@
+---
+title: "QC & filtering P6"
+author: "Anne Hoffrichter, Eric Poisel, Lea Zillich"
+date: "2021/11/02"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy.opts=list(width.cutoff=80),tidy=TRUE, fig.asp=0.5, fig.width=12, warning = FALSE)
+knitr::opts_knit$set(root.dir = "..")
+getwd()
+```
+
+```{r loadLibraries, message=FALSE}
+library(SingleCellExperiment)
+library(ggplot2)
+library(scater)
+library(Matrix)
+library(dplyr)
+options(stringsAsFactors = FALSE)
+```
+
+### Load data
+Feature barcode matrix is loaded and transformed into the SCE format.
+```{r loadData}
+cellbarcodes <- read.table("path/to/barcodes.tsv.gz")
+genenames <- read.table("path/to/features.tsv.gz")
+molecules <- readMM("path/to/matrix.mtx.gz")
+rownames(molecules) <- genenames[,1]
+colnames(molecules) <- cellbarcodes[,1]
+umi <- SingleCellExperiment(assays=list(counts=as.matrix(molecules)))
+```
+
+### Start QC & Filtering
+- Remove genes that are not expressed in any cell
+```{r KeepOnlyGenesExpressedInAtLeastOneCell}
+keep_feature <- rowSums(counts(umi) > 0) > 0
+umi <- umi[keep_feature, ]
+```
+
+- Define control features for  MT genes
+```{r DefineMTgenes}
+is.spike <- rownames(umi) %in% 
+ c("ENSG00000198899", "ENSG00000198727", "ENSG00000198888",
+   "ENSG00000198886", "ENSG00000212907", "ENSG00000198786",
+   "ENSG00000198695", "ENSG00000198712", "ENSG00000198804",
+   "ENSG00000198763", "ENSG00000228253", "ENSG00000198938",
+   "ENSG00000198840")
+umi <- splitAltExps(umi, ifelse(is.spike, "MT", "gene"))
+```
+
+- Calculate quality metrics
+```{r qualityMetricsMT, warning=FALSE}
+umi2 <- perCellQCMetrics(umi, use_altexps = TRUE)
+```
+
+### Cell QC   
+```{r HistTotalCounts}
+hist(
+  umi2$total,
+  breaks = 400,
+  xlim=range(1:30000)
+)
+abline(v = 2200, col = "red")
+```
+
+```{r FilterTotalCounts}
+filter_by_total_counts <- (umi2$total > 2200)
+table(filter_by_total_counts)
+```
+
+```{r HistDetectedGenes}
+hist(
+  umi2$detected,
+  breaks = 100
+)
+abline(v = 1100, col = "red")
+```
+
+```{r FilterExprFeatures}
+filter_by_expr_features <- (umi2$detected > 1100)
+table(filter_by_expr_features)
+```
+
+```{r PlotMTgenes}
+plot(
+ x = umi2$detected,
+ y = umi2$altexps_MT_percent
+)
+```
+
+Create filters for removing cells with high expression of mitochondrial genes (>10% of total counts in a cell)
+
+```{r FilterMTgenes}
+filter_by_MT <- umi2$altexps_MT_percent < 10
+table(filter_by_MT)
+```
+
+Defining a cell filter based on the previous analysis.   
+Number of cells that will be removed by the filters:
+
+```{r AllFilters}
+umi2$use <- (
+  # sufficient features (genes)
+  filter_by_expr_features &
+  # sufficient molecules counted
+  filter_by_total_counts &
+  # remove cells with unusual number of reads in MT genes
+  filter_by_MT
+)
+table(umi2$use)
+```
+
+```{r FilterParameters}
+param <- list()
+param$total_counts <- 2200
+param$expr_features <- 1100
+param$MT <- 10
+write.table(param, "path/to/001_filter_param_P6.txt", quote = F)
+```
+
+```{r sessioninfo}
+sessionInfo()
+```
