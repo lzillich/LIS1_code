@@ -1,0 +1,197 @@
+---
+title: "Preprocessing Mild"
+author: "Anne Hoffrichter, Eric Poisel, Lea Zillich"
+date: "2021/11/23"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy.opts=list(width.cutoff=80),tidy=TRUE, fig.asp=0.5, fig.width=12, warning = FALSE)
+```
+
+```{r loadLibraries, message=FALSE, warning=FALSE}
+library(Seurat)
+library(ggplot2)
+library(cowplot)
+library(openxlsx)
+set.seed(42)
+```
+
+## Mild
+
+- Set up Mild object   
+```{r setUpMildSeuratObject}
+Mild1.rawdata <- Read10X("path/to/raw_data/P2/filtered_feature_bc_matrix/")
+Mild2.rawdata <- Read10X("path/to/raw_data/P1/filtered_feature_bc_matrix/")
+Mild1Param <- read.table("path/to/001_filter_param_P2.txt")
+Mild2Param <- read.table("path/to/001_filter_param_P1.txt")
+
+Mild1 <- CreateSeuratObject(counts =Mild1.rawdata, min.cells = 3, min.features = Mild1Param$expr_features, project = "OK")
+Mild1$replicate <- "Mild1"
+Mild1[["percent.mt"]] <- PercentageFeatureSet(object = Mild1, pattern = "^MT-")
+
+Mild2 <- CreateSeuratObject(counts = Mild2.rawdata, min.cells = 3, min.features = Mild2Param$expr_features, project = "OK")
+Mild2$replicate <- "Mild2"
+Mild2[["percent.mt"]] <- PercentageFeatureSet(object = Mild2, pattern = "^MT-")
+```
+
+- Filter Mild cells
+  - by total counts
+  - by percent of mitochondrial genes expressed
+```{r filterMildCells, message=FALSE}
+Mild1 <- subset(x=Mild1, subset= colSums(Mild1)>Mild1Param$total_counts & percent.mt <Mild1Param$MT)
+Mild2 <- subset(x=Mild2, subset= colSums(Mild2)>Mild2Param$total_counts & percent.mt <Mild2Param$MT)
+```
+
+- Additional QC steps - EP for Seurat v. 4.x
+  - SCTransform and add cell cycle annotation
+  - remove doublets
+  - integrate objects and generate clusters 
+```{r cellCycle, message=FALSE}
+
+#### Mild1 ####
+
+# SCTransform
+Mild1 <- SCTransform(
+  Mild1,
+  assay = 'RNA',
+  new.assay.name = 'SCT',
+  vars.to.regress = c('percent.mt', 'nFeature_RNA', 'nCount_RNA'),
+  verbose = F
+)
+
+# perform cell cycle scoring
+Mild1<- CellCycleScoring(
+  Mild1,
+  s.features = cc.genes$s.genes,
+  g2m.features = cc.genes$g2m.genes,
+  assay = 'SCT',
+  set.ident = TRUE
+)
+
+Mild1$CC.Difference <- Mild1$S.Score - Mild1$G2M.Score
+
+# second SCTransform step 
+Mild1 <- SCTransform(
+  Mild1,
+  assay = 'RNA',
+  new.assay.name = 'SCT',
+  vars.to.regress = c('percent.mt', 'nFeature_RNA', 'nCount_RNA', 'CC.Difference'),
+  verbose = F
+)
+
+#### Mild2 ####
+
+# SCTransform
+Mild2 <- SCTransform(
+  Mild2,
+  assay = 'RNA',
+  new.assay.name = 'SCT',
+  vars.to.regress = c('percent.mt', 'nFeature_RNA', 'nCount_RNA'),
+  verbose=FALSE
+)
+
+# perform cell cycle scoring
+Mild2<- CellCycleScoring(
+  Mild2,
+  s.features = cc.genes$s.genes,
+  g2m.features = cc.genes$g2m.genes,
+  assay = 'SCT',
+  set.ident = TRUE
+)
+
+Mild2$CC.Difference <- Mild2$S.Score - Mild2$G2M.Score
+
+# second SCTransform step 
+Mild2 <- SCTransform(
+  Mild2,
+  assay = 'RNA',
+  new.assay.name = 'SCT',
+  vars.to.regress = c('percent.mt', 'nFeature_RNA', 'nCount_RNA', 'CC.Difference'),
+  verbose = F
+)
+```
+
+```{r DoubletRemoval, message=FALSE}
+suppressMessages(require(DoubletFinder))
+
+# Estimated number of expected multiplets based on the number of analyzed cells (see https://nbisweden.github.io/workshop-scRNAseq/labs/compiled/seurat/seurat_01_qc.html)
+
+#Mild1: around 3500 cells prior to QC -> 3% doublets
+nExp1 <- round(ncol(Mild1) * 0.03)
+#Mild2: around 6000 cells prior to QC -> 4.6% doublets
+nExp2 <- round(ncol(Mild2) * 0.046)
+
+# Determine dimensionality of the dataset for doublet estimation 
+Mild1 <- RunPCA(Mild1, verbose = FALSE)
+Mild2 <- RunPCA(Mild2, verbose = FALSE)
+ElbowPlot(Mild1) # 15 PCs
+ElbowPlot(Mild2) # 15 PCs
+```
+
+```{r parameterOptimization, message=FALSE, include=FALSE}
+sweep.res1 <- paramSweep_v3(Mild1,sct = TRUE, PCs = 1:15) 
+sweep.stats1 <- summarizeSweep(sweep.res1, GT = FALSE) 
+bcmvn1 <- find.pK(sweep.stats1) 
+barplot(bcmvn1$BCmetric, names.arg = bcmvn1$pK, las=2)
+# maximum at pK = 0.11
+
+sweep.res2 <- paramSweep_v3(Mild2,sct = TRUE, PCs = 1:15) 
+sweep.stats2 <- summarizeSweep(sweep.res2, GT = FALSE) 
+bcmvn2 <- find.pK(sweep.stats2) 
+barplot(bcmvn2$BCmetric, names.arg = bcmvn2$pK, las=2)
+# maximum at pK = 0.07
+```
+
+```{r findDoublets1, message=FALSE, include = FALSE}
+Mild1 <- doubletFinder_v3(Mild1, pN = 0.25, pK = 0.11, nExp = nExp1, PCs = 1:15, sct = T)
+```
+
+```{r removeDoublets1, message=FALSE}
+DF.name1 = colnames(Mild1@meta.data)[grepl("DF.classification", colnames(Mild1@meta.data))]
+cowplot::plot_grid(ncol = 2, DimPlot(Mild1, group.by = "orig.ident") + NoAxes(), 
+    DimPlot(Mild1, group.by = DF.name1) + NoAxes())
+VlnPlot(Mild1, features = "nFeature_RNA", group.by = DF.name1, pt.size = 0.1)
+Mild1 = Mild1[, Mild1@meta.data[, DF.name1] == "Singlet"]
+```
+
+```{r findDoublets2, message=FALSE, include = FALSE}
+Mild2 <- doubletFinder_v3(Mild2, pN = 0.25, pK = 0.07, nExp = nExp2, PCs = 1:15, sct = T)
+```
+
+```{r removeDoublets2, message=FALSE}
+DF.name2 = colnames(Mild2@meta.data)[grepl("DF.classification", colnames(Mild2@meta.data))]
+cowplot::plot_grid(ncol = 2, DimPlot(Mild2, group.by = "orig.ident") + NoAxes(), 
+    DimPlot(Mild2, group.by = DF.name2) + NoAxes())
+VlnPlot(Mild2, features = "nFeature_RNA", group.by = DF.name2, pt.size = 0.1)
+Mild2 = Mild2[, Mild2@meta.data[, DF.name2] == "Singlet"]
+```
+
+```{r IntegrateObjectMild}
+Mild.list <- list(Mild1,Mild2)
+
+options(future.globals.maxSize = 8000 * 1024^2)
+Mild.features <- SelectIntegrationFeatures(object.list = Mild.list)
+Mild.list <- PrepSCTIntegration(object.list = Mild.list, anchor.features = Mild.features, 
+    verbose = FALSE)
+
+Mild.anchors <- FindIntegrationAnchors(object.list = Mild.list, normalization.method = "SCT", 
+    anchor.features = Mild.features, verbose = FALSE)
+Mild.integrated <- IntegrateData(anchorset = Mild.anchors, normalization.method = "SCT", verbose = FALSE)
+
+Mild.integrated <- RunPCA(Mild.integrated, verbose = FALSE)
+Mild.integrated <- RunUMAP(Mild.integrated, reduction = "pca", dims = 1:50)
+Mild.integrated <- FindNeighbors(Mild.integrated, dims = 1:50, verbose = FALSE)
+Mild.integrated <- FindClusters(Mild.integrated, verbose = FALSE,resolution = 0.15)
+```
+
+- Save the objects after filtering and processing steps.
+```{r saveObjectsAfterGeneralFilteringSteps}
+saveRDS(Mild.integrated, "path/to/seurat_objects/Mild_integrated_sct.rds")
+```
+
+```{r sessioninfo}
+sessionInfo()
+```
