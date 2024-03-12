@@ -1,0 +1,415 @@
+---
+title: "Figures & Analyses"
+author: "Lea Zillich, Anne Hoffrichter, Eric Zillich"
+date: "2022/02/17"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy.opts=list(width.cutoff=80),tidy=TRUE, fig.asp=0.5, fig.width=12, warning = FALSE)
+```
+
+```{r loadLibraries, message=FALSE, warning=FALSE}
+library(Seurat)
+library(ggplot2)
+library(cowplot)
+library(openxlsx)
+library(dplyr)
+library(readxl)
+library(fgsea)
+library(msigdb)
+library(enrichR)
+library(msigdbr)
+library(org.Hs.eg.db)
+library(tidyverse)
+library(patchwork)
+library(GO.db)
+library(ggpubr)
+library(pheatmap)
+library(VennDiagram)
+set.seed(42)
+```
+
+- Import integrated object
+```{r importObject}
+sc <- readRDS(file = "path/to/seurat_objects/LIS1_integrated.rds")
+```
+
+```{r normalize data}
+# Set Idents to clusters names
+Idents(sc) <- "cell_types"
+
+# Normalize and scale RNA assay
+sc <- NormalizeData(sc, assay = "RNA")
+sc <- FindVariableFeatures(sc, selection.method = "vst", assay = "RNA")
+sc <- ScaleData(sc, features = rownames(sc), assay = "RNA")
+```
+
+
+- Figure 2B & Sup Figure S2A
+```{r DimPLots data}
+p1 <- DimPlot(sc, reduction = "umap",  cols = c("#C7361B","#F7AB64", "#313C48","#880000","#006960","#FCD8C1","#428E77","#778CA1","#BFE1D7","#21473C"))
+
+ggsave("/path/to/figures/Fig2b_DimPlot.png", p1, width= 7, height = 5, dpi=600)
+
+p2 <- DimPlot(sc, reduction = "umap",  split.by = "replicate",cols = c("#C7361B","#F7AB64", "#313C48","#880000","#006960","#FCD8C1","#428E77","#778CA1","#BFE1D7","#21473C"),ncol=4)
+
+
+ggsave("/path/to/figures/SupFig2A_DimPlot_by_replicate.pdf", p2, width= 9, height = 6, dpi=600)
+
+p1
+p2
+```
+
+- Figure 2C
+
+```{r celltypes stacked}
+samples <- c(rep("Ctrl" , 10) , rep("Mild" , 10), rep("Moderate" , 10), rep("Severe" , 10))
+
+celltypes <- rep(names(table(sc$cell_types)) , 4)
+prop <- table(sc$condition,sc$cell_types)
+
+value <- c(unname(prop[1,]),unname(prop[2,]),unname(prop[3,]),unname(prop[4,]))
+
+cell_perc <- data.frame(samples,celltypes,value)
+cell_perc$celltypes <- factor(cell_perc$celltypes, levels =c("IP","vFB-N","dFB-N","MB-N","IN","G","t-RG","RG","CyP","NE"))
+     
+cell_perc$samples <- factor(cell_perc$samples)
+
+# Stacked + percent
+per <- ggplot(cell_perc, aes(fill=celltypes, y=value, x=samples)) + 
+    geom_bar(position="fill", stat="identity")+scale_fill_manual(values=c("#21473C","#428E77","#006960","#BFE1D7","#778CA1","#313C48", "#880000","#C7361B","#F7AB64","#FCD8C1"))+ylab("celltype proportion")+xlab(NULL)+
+  theme_void()+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1), axis.text.y = element_text(), axis.title.y = element_text(angle = 90,vjust=1))
+ggsave(plot = per,filename ="path/to/figures/Fig2C_celltype_percentage.pdf", width = 3, height=5)
+```
+
+
+
+## Supplementary Figures 3C
+
+```{r sut-RG fig 3c 3d, warning=FALSE, message=FALSE, results='hide'}
+cell_perc$percent <- c(cell_perc$value[cell_perc$samples=="Ctrl"]/sum(cell_perc$value[cell_perc$samples=="Ctrl"]),
+                       cell_perc$value[cell_perc$samples=="Mild"]/sum(cell_perc$value[cell_perc$samples=="Mild"]),
+                       cell_perc$value[cell_perc$samples=="Moderate"]/sum(cell_perc$value[cell_perc$samples=="Moderate"]),
+                       cell_perc$value[cell_perc$samples=="Severe"]/sum(cell_perc$value[cell_perc$samples=="Severe"]))
+
+cell_prog <- data.frame(condition=rep(c("Ctrl","Mild","Moderate","Severe"),2),
+                        type=c(rep("Progenitor",4),rep("Differentiated Cells",4)),
+                        perc=c(sum(cell_perc$percent[cell_perc$samples=="Ctrl"& (cell_perc$celltypes=="RG"|cell_perc$celltypes=="t-RG"|cell_perc$celltypes=="NE")]),sum(cell_perc$percent[cell_perc$samples=="Mild"& (cell_perc$celltypes=="RG"|cell_perc$celltypes=="t-RG")]), sum(cell_perc$percent[cell_perc$samples=="Moderate"&  (cell_perc$celltypes=="RG" |cell_perc$celltypes=="t-RG"|cell_perc$celltypes=="NE")]), sum(cell_perc$percent[cell_perc$samples =="Severe"& (cell_perc$celltypes=="RG"|cell_perc$celltypes=="t-RG"|cell_perc$celltypes=="NE")]), sum(cell_perc$percent[cell_perc$samples=="Ctrl"& (cell_perc$celltypes =="dFB-N" |cell_perc$celltypes=="vFB-N"|cell_perc$celltypes=="MB-N"|cell_perc$celltypes=="IN"|cell_perc$celltypes=="G")]),sum(cell_perc$percent[cell_perc$samples=="Mild"& (cell_perc$celltypes=="dFB-N" |cell_perc$celltypes=="vFB-N"|cell_perc$celltypes=="MB-N"|cell_perc$celltypes=="IN"|cell_perc$celltypes=="G")]), sum(cell_perc$percent[cell_perc$samples=="Moderate"& (cell_perc$celltypes=="dFB-N" |cell_perc$celltypes=="vFB-N"|cell_perc$celltypes=="MB-N"|cell_perc$celltypes=="IN"|cell_perc$celltypes=="G")]),sum(cell_perc$percent[cell_perc$samples=="Severe"& (cell_perc$celltypes=="dFB-N" |cell_perc$celltypes=="vFB-N"|cell_perc$celltypes=="MB-N"|cell_perc$celltypes=="IN"|cell_perc$celltypes=="G")])))
+cell_prog$type <- factor(cell_prog$type, levels = c("Progenitor","Differentiated Cells"))
+
+df_bar_prog <- cell_perc[cell_perc$celltypes=="IP"|cell_perc$celltypes=="t-RG"|cell_perc$celltypes=="RG"|cell_perc$celltypes=="CyP"|cell_perc$celltypes=="NE",]
+
+bar_prog <- ggplot(df_bar_prog, aes(x=celltypes, y=percent, fill=samples, color=samples)) + ylim(0,1) +
+  geom_bar(stat="identity", color="black",position=position_dodge())+theme_classic()+
+  labs(y="cells (%)") + scale_fill_manual(values=c()) + theme(text = element_text(size=18),axis.title.x=element_blank(), axis.text.y=element_text(size=18), legend.text = element_text(size=14), axis.ticks.x = element_blank(),legend.position = "bottom") + scale_fill_manual(values=c("gray93","gray68","gray43","gray23"), labels=c("control","mild","moderate","severe"))
+
+ggsave(bar_prog,filename ="/path/to/figures/SupFig3C_barplot_progenitor.pdf", width = 10, height=7)
+
+```
+
+- Supplement Figure S2B
+```{r dotplot markers}
+genes <- c("TOP2A","TPX2","MKI67","CTNNB1","CDH2", "FABP7", "HES1","HES4","HES5", "SOX2", "SOX4", "VIM", "NES", "ANXA5", "PTPRZ1", "FABP5","C1orf61", "OTX2", "PAX6", "EMX2", "SFRP1", "NEUROD1","EOMES",  "ELAVL4", "TBR1", "STMN1", "DCX", "MAP2", "DLX1", "DLX2", "SLC32A1", "ARX", "SST", "ROBO2", "LMX1B","EN1", "EN2", "MOXD1", "S100B")
+
+sc@active.ident <- factor(sc@active.ident, 
+                            levels=c("NE",
+                                     "CyP",
+                                     "RG",
+                                     "t-RG",
+                                     "IP",
+                                     "dFB-N", 
+                                     "vFB-N", 
+                                     "IN", 
+                                     "MB-N", 
+                                     "G"))
+
+
+p3 <- DotPlot(object = sc, features = genes,assay ="RNA", dot.scale = 5, cols = c("lightgrey","purple4")) + 
+  theme(axis.text.x = element_text(angle = 90)) + 
+  theme(axis.text.y = element_text(size=12)) + 
+  theme(axis.text.x = element_text(size=12)) + 
+  theme(text=element_text(size = 12)) + 
+  theme(aspect.ratio =0.5)
+
+ggsave("/path/to/figures/SupFig2B_DotPlot.png", p3, width= 10, height = 5, dpi=600)
+```
+
+
+
+## Differential expression analysis
+
+```{r DEanalysis, warning=FALSE, message=FALSE, results='hide'}
+
+sc@meta.data$progenitor <- ifelse(sc@meta.data$cell_types==c("RG", "NE", "t-RG"),"progenitor",NA)
+
+sc@meta.data$DE_progenitor <- paste0(sc@meta.data$condition,"_",sc@meta.data$progenitor)
+Idents(sc) <- "DE_progenitor"
+
+DefaultAssay(sc) <- "RNA"
+
+for (i in c("Mild","Moderate","Severe")){
+
+markers_cl <- FindMarkers(sc,ident.1 = paste0(i,"_progenitor"), ident.2 = "Ctrl_progenitor", min.pct = 0.25,assay = "RNA", log2threshold=0.5)
+head(markers_cl,100)
+
+write.csv(markers_cl, paste0("/path/to/DEresults/progenitor_",i,".csv"), row.names = T)
+
+}
+
+save(sc, file="/path/to/seurat_objects/LIS1_integrated_DE.rds")
+```
+
+
+# Heatmap of DE genes across clusters - Figure 2D
+
+```{r hm_GEX,warning=FALSE, message=FALSE, results='hide'}
+# Import DE results - log2FC 0.5 cutoff and padj 0.05, only celltypes with more than 100 cells from each condition
+
+mild_vs_ctrl <- read.csv("/path/to/DEresults/progenitor_mild.csv")
+mild_sig <- mild_vs_ctrl[mild_vs_ctrl$p_val_adj<0.05 & abs(mild_vs_ctrl$avg_log2FC)>0.5 ,]
+mild_sig <- mild_sig[mild_sig$pct.1 > 0.25 | mild_sig$pct.2 > 0.25, ]
+mild_top10 <- mild_sig$X[order(abs(mild_sig$avg_log2FC),decreasing = T)][c(1:10)]
+write.table(mild_sig, "/path/to/DEresults/progenitor_mild_significant.csv",row.names = F, quote = F,sep=",")
+
+moderate_vs_ctrl <- read.csv("/path/to/DEresults/progenitor_moderate.csv")
+moderate_sig <- moderate_vs_ctrl[moderate_vs_ctrl$p_val_adj<0.05 & abs(moderate_vs_ctrl$avg_log2FC)>0.5 ,]
+moderate_sig <- moderate_sig[moderate_sig$pct.1 > 0.25 | moderate_sig$pct.2 > 0.25, ]
+write.table(moderate_sig, "/path/to/DEresults/progenitor_moderate_significant.csv",row.names = F, quote = F,sep=",")
+moderate_top10 <- moderate_sig$X[order(abs(moderate_sig$avg_log2FC),decreasing = T)][c(1:10)]
+
+severe_vs_ctrl <- read.csv("/path/to/DEresults/progenitor_severe.csv")
+severe_sig <- severe_vs_ctrl[severe_vs_ctrl$p_val_adj<0.05 & abs(severe_vs_ctrl$avg_log2FC)>0.5 ,]
+severe_sig <- severe_sig[severe_sig$pct.1 > 0.25 | severe_sig$pct.2 > 0.25, ]
+severe_top10 <- severe_sig$X[order(abs(severe_sig$avg_log2FC),decreasing = T)][c(1:10)]
+write.table(severe_sig, "/path/to/DEresults/progenitor_severe_significant.csv",row.names = F, quote = F,sep=",")
+
+# Get list of DE genes that need to be included in the heatmap
+DE_genes <- c(mild_sig$X,moderate_sig$X,severe_sig$X)
+DE_genes <- DE_genes[!duplicated(DE_genes)]
+
+# Obtain log2FCs for each cluster for the selection of DE genes
+mild <- mild_vs_ctrl[mild_vs_ctrl$X %in% DE_genes,c("X","avg_log2FC")]
+colnames(mild)[2] <- "mild"
+
+moderate <- moderate_vs_ctrl[moderate_vs_ctrl$X %in% DE_genes,c("X","avg_log2FC")]
+colnames(moderate)[2] <- "moderate"
+
+severe <- severe_vs_ctrl[severe_vs_ctrl$X %in% DE_genes,c("X","avg_log2FC")]
+colnames(severe)[2] <- "severe"
+
+
+
+# merge dfs
+library(tidyverse)
+dfs<-list(mild, moderate, severe) %>% reduce(inner_join,by="X")
+rownames(dfs)<-dfs$X
+
+# Create log2FC heatmap
+hm_DEG <- as.matrix(dfs[,-1])
+
+#reorder the rows to match with annotation labels
+library(ComplexHeatmap)
+rows_DEG <- row_order(Heatmap(hm_DEG,name="log2FC",column_names_gp  = gpar(fontsize=8),column_names_rot = 45))
+hm_DEG <- hm_DEG[rows_DEG,]
+
+# subset genes for labeling in the heatmap
+lab <- rownames(hm_DEG)
+lab_genes <- c(mild_top10,moderate_top10,severe_top10)
+ #remove mitochondrial genes, pseudogenes and XIST
+
+lab_genes <- lab_genes[-grep("RPS|RPL|XIST|MT-|AC|AL",lab_genes)]
+lab[!(lab %in% lab_genes)] <- ""
+lab_genes <- unique(lab_genes)
+
+# Plot heatmap
+library(colorRamp2)
+col_fun_rna = colorRamp2(c(0,0.25, 0.5,0.75, 1), c("#1B4D68","#28739C","#E4E4E4","#F7AB64","#C7361B"))
+col_fun_prot = colorRamp2(c(0,0.25, 0.5,0.75, 1), c("#003E65","#3A98CC","#E4E4E4","#F7AB64","#C7361B"))
+
+pdf("/path/to/figures/Fig2E_DEG_hm.pdf",width=3,height=3)
+Heatmap(hm_DEG,name="log2FC", col=col_fun_rna(seq(0,1,length=100)),show_row_dend=F,cluster_columns = FALSE,column_names_gp  = gpar(fontsize=8),column_names_rot = 45,heatmap_legend_param = list(title_gp = gpar(fontsize = 7),labels_gp=gpar(fontsize=6))) + rowAnnotation(link = anno_mark(at = which(rownames(hm_DEG)==lab), 
+        labels = lab[lab !=""], padding = unit(1, "mm"),link_gp = gpar(lwd = 0.1) ,labels_gp = gpar(fontsize = 7)))
+dev.off()
+
+venn.diagram(x=list(mild_sig$X,moderate_sig$X,severe_sig$X), category.names = c("mild", "moderate", "severe"),  fill = c("#F7AB64","#C7361B","#880000"),fontfamily ="calibri",cat.fontfamily = "calibri", cex = 2, cat.cex = 1.3, "/path/to/figures/SupFig3D_venn.png")
+
+```
+
+
+- Figure S3D
+
+## Violin plots GO terms 
+
+```{r define function, warning=FALSE, results='hide'}
+add_GO_perc <- function(data, GO_term){
+  go_id = GOID(GOTERM[Term(GOTERM) == GO_term])
+  allegs <- get(go_id, org.Hs.egGO2ALLEGS)
+  genes <- unlist(mget(allegs, org.Hs.egSYMBOL))
+  genes <- unique(genes)        
+  genes <- genes[genes %in% rownames(data)]
+  PercentageFeatureSet(object=data, features=genes, col.name = GO_term)
+}  
+```
+
+```{r subset sc object, warning=FALSE, results='hide'}
+DefaultAssay(sc) <- "RNA"
+sc@meta.data$cluster_condition <- paste0(sc@meta.data$condition,sc@meta.data$seurat_clusters)
+Idents(sc) <- "cluster_condition"
+
+RG_tRG <- FindMarkers(sc,ident.1 = "Severe3", ident.2 = "Ctrl0", min.pct = 0.25,assay = "RNA", log2threshold=0.5)
+RG_tRG <- RG_tRG[RG_tRG$p_val_adj<.05&abs(RG_tRG$avg_log2FC>0.5),]
+head(RG_tRG,100)
+
+RG_tRG$gene <- rownames(RG_tRG)
+
+write.table(RG_tRG, "/path/to/DEresults/RG_t-RG_marker.txt", row.names = F,sep=";",quote=F)
+
+library(org.Hs.eg.db)
+hs <- org.Hs.eg.db
+ann_RGtRG <- AnnotationDbi::select(hs, 
+       keys = RG_tRG$gene,
+       columns = c("ENTREZID", "SYMBOL"),
+       keytype = "SYMBOL")
+library(clusterProfiler)
+go.obj <- enrichGO(ann_RGtRG$ENTREZID,OrgDb = "org.Hs.eg.db",ont="BP")
+go.res <- go.obj@result
+
+write.table(go.res,"/path/to/DEresults/RG_t-RG_GO.txt", row.names = F,sep=";",quote=F)
+
+# Comparison only in Severe vs. Ctrl, cluster 3 = t-RG, cluster 0 = RG
+sc2 <- subset(sc, idents=c("Severe3","Ctrl0"))
+Idents(sc2) <- "cell_types"
+```
+
+## RG and t-RG clusters - neurogenesis-related terms - Figure 2D
+```{r GO plots, warning=FALSE, results='hide'}
+GO_terms <- c("neuron differentiation","neuron fate commitment","regulation of neuron differentiation","epithelial tube formation")
+
+for(i in seq_along(GO_terms)){
+  sc2 <- add_GO_perc(sc2, GO_terms[i])
+}
+
+titles <- c("neuron differentiation","neuron fate commitment","regulation of neuron differentiation","epithelial tube formation")
+GO_terms_no_space <- str_replace_all(GO_terms, " ", ".")
+plots <- map2(GO_terms_no_space, titles, ~VlnPlot(sc2, features=.x, split.by = "cell_types", pt.size=0.1)+ ggtitle(.y))
+
+wil_t <- list()
+for(i in GO_terms_no_space){
+  df <- data.frame(GO=sc2[[i]], clusters=sc2$cell_types)
+  wil_t[[i]] <- wilcox.test(x=filter(df, clusters=="RG")[,1], y=filter(df, clusters=="t-RG")[,1])
+}
+
+# p-values 
+wil_t$neuron.differentiation$p.value 
+wil_t$generation.of.neurons$p.value 
+wil_t$neuron.fate.commitment$p.value 
+wil_t$regulation.of.neuron.differentiation$p.value 
+
+plots[[1]] <- plots[[1]]+
+  annotate("text", x=1.5, y=max(sc2[[GO_terms_no_space[1]]])+max(sc2[[GO_terms_no_space[1]]])*0.1, label="***", size=10)+
+  ylim(min(sc2[[GO_terms_no_space[1]]])-min(sc2[[GO_terms_no_space[1]]])*0.15,max(sc2[[GO_terms_no_space[1]]])+max(sc2[[GO_terms_no_space[1]]])*0.15)
+plots[[2]] <- plots[[2]]+
+  annotate("text", x=1.5, y=max(sc2[[GO_terms_no_space[2]]])+max(sc2[[GO_terms_no_space[2]]])*0.1, label="***", size=10)+
+  ylim(min(sc2[[GO_terms_no_space[2]]])-min(sc2[[GO_terms_no_space[2]]])*0.15,max(sc2[[GO_terms_no_space[2]]])+max(sc2[[GO_terms_no_space[2]]])*0.15)
+plots[[3]] <- plots[[3]]+
+  annotate("text", x=1.5, y=max(sc2[[GO_terms_no_space[3]]])+max(sc2[[GO_terms_no_space[3]]])*0.1, label="***", size=10)+
+  ylim(min(sc2[[GO_terms_no_space[3]]])-min(sc2[[GO_terms_no_space[3]]])*0.15,max(sc2[[GO_terms_no_space[3]]])+max(sc2[[GO_terms_no_space[3]]])*0.15)
+plots[[4]] <- plots[[4]]+
+  annotate("text", x=1.5, y=max(sc2[[GO_terms_no_space[4]]])+max(sc2[[GO_terms_no_space[4]]])*0.1, label="***", size=10)+
+  ylim(min(sc2[[GO_terms_no_space[4]]])-min(sc2[[GO_terms_no_space[4]]])*0.15,max(sc2[[GO_terms_no_space[4]]])+max(sc2[[GO_terms_no_space[4]]])*0.15)
+
+
+vln <- wrap_plots(plots, guides="collect", nrow=2)& 
+  theme(axis.title.x=element_blank(), axis.text.y=element_text(size=10), plot.title = element_text(size=8.5), legend.text = element_text(size=10), axis.title.y=element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank())&
+  ylab("Proportion of feature set")&
+  scale_fill_manual(values=c("#CC5500","#880000"), labels=c("RG","t-RG"))
+
+ggsave("/path/to/Fig2D_VlnPlot.png", vln, width= 5, height = 5, dpi=600)
+```
+
+
+```{r subset sc object for GO plots, warning=FALSE, results='hide'}
+DefaultAssay(sc) <- "RNA"
+Idents(sc) <- "DE_progenitor"
+
+sc3 <- subset(sc, idents=c("Ctrl_progenitor","Mild_progenitor","Moderate_progenitor","Severe_progenitor"))
+Idents(sc3) <- "condition"
+```
+
+
+- Figure 4L
+
+# WNT gene heatmap in CyP cluster 
+
+```{r define stars function, warning=FALSE}
+stars_gen <- function(x){
+  stars <- c( "***", "**", "*","")
+  vec <- c(0, 0.001, 0.01, 0.05,1.01)
+  i <- findInterval(x, vec)
+  stars[i]
+}
+```
+
+# Generate DE gene lists for CyP cluster
+```{r DE 1, results='hide', warning=FALSE, results='hide'}
+Idents(sc)<- "cluster_condition"
+
+# Cluster 1 are CyP cells
+markers_Mild_vs_Ctrl_1 <- FindMarkers(sc,ident.1 = "Mild1" , ident.2 = "Ctrl1", min.pct = 0.25,assay = "RNA", logfc.threshold = 0)
+markers_Moderate_vs_Ctrl_1 <- FindMarkers(sc,ident.1 = "Moderate1" , ident.2 = "Ctrl1", min.pct = 0.25,assay = "RNA", logfc.threshold = 0)
+markers_Severe_vs_Ctrl_1 <- FindMarkers(sc,ident.1 = "Severe1" , ident.2 = "Ctrl1", min.pct = 0.25,assay = "RNA", logfc.threshold = 0)
+
+
+```
+
+# Specify marker genes
+```{r gene lists, results='hide', warning=FALSE}
+list <- c("AXIN1","BCL9","BCL9L","CBY1","CSNK1E","CTDNEP1","CTNNB1","DACT3","DISC1","DIXDC1","DKK1","DVL1","DVL1P1","DVL2",    "DVL3","EDA","EDN1","EDNRA","EDNRB","EXT1","FGF2","FGF9","FOXD1","FOXO1","FOXO3","FRAT1" ,"FRZB","FZD1","FZD10","FZD2","FZD3" ,   "FZD4","FZD5","FZD6","FZD7","FZD8","FZD9","GPC3","HESX1","ISL1","JUP","KLF4","LATS2","LEF1","LRP5","LRP6","LRRK2","NR4A2","PLt-RG3",   "PTEN" ,"PYGO1","PYGO2","RARG","RECK","RSPO2","RSPO3","RYK","SDC1","SFRP1","SFRP2","SFRP4","SFRP5","SHH","SIAH1","SIAH2","SOST",    "SOSTDC1","SOX9","STK3" , "STK4","TCF7","TCF7L1","TCF7L2","WNT1" ,"WNT10A","WNT10B","WNT11" ,"WNT16" ,"WNT2","WNT2B","WNT3",    "WNT3A" ,"WNT4","WNT5A","WNT5B","WNT6","WNT7A","WNT7B","WNT8A","WNT8B","WNT9A","WNT9B","YAP1")
+```
+
+# Generate heatmap
+
+```{r heatmapsWntcanonicalCyP, results='hide', warning=FALSE}
+
+list_Mild_vs_Ctrl_1 <- markers_Mild_vs_Ctrl_1[rownames(markers_Mild_vs_Ctrl_1) %in% list,2:5]
+colnames(list_Mild_vs_Ctrl_1) <- paste0("Mild_",colnames(list_Mild_vs_Ctrl_1))
+list_Moderate_vs_Ctrl_1 <- markers_Moderate_vs_Ctrl_1[rownames(markers_Moderate_vs_Ctrl_1) %in% list,2:5]
+colnames(list_Moderate_vs_Ctrl_1) <- paste0("Moderate_",colnames(list_Moderate_vs_Ctrl_1))
+list_Severe_vs_Ctrl_1 <- markers_Severe_vs_Ctrl_1[rownames(markers_Severe_vs_Ctrl_1) %in% list,2:5]
+colnames(list_Severe_vs_Ctrl_1) <- paste0("Severe_",colnames(list_Severe_vs_Ctrl_1))
+
+# Subset shared genes CyP
+shared <- Reduce(intersect, list(rownames(list_Mild_vs_Ctrl_1),rownames(list_Moderate_vs_Ctrl_1),rownames(list_Severe_vs_Ctrl_1)))
+
+
+list_Mild_vs_Ctrl_1 <- list_Mild_vs_Ctrl_1[rownames(list_Mild_vs_Ctrl_1) %in% shared,]
+list_Moderate_vs_Ctrl_1 <- list_Moderate_vs_Ctrl_1[rownames(list_Moderate_vs_Ctrl_1) %in% shared,]
+list_Severe_vs_Ctrl_1 <- list_Severe_vs_Ctrl_1[rownames(list_Severe_vs_Ctrl_1) %in% shared,]
+cluster1 <- cbind(list_Mild_vs_Ctrl_1,list_Moderate_vs_Ctrl_1,list_Severe_vs_Ctrl_1)
+
+
+# Select log2FC values
+cluster1_log2FC <- as.matrix(cluster1[,c(1,5,9)])
+colnames(cluster1_log2FC) <- c("Mild","Moderate","Severe")
+
+
+# Generate information on significance
+cluster1_p <- cluster1[,c(4,8,12)]
+colnames(cluster1_p) <- c("Mild","Moderate","Severe")
+for(i in colnames(cluster1_p)){
+cluster1_p[,i] <- stars_gen(cluster1_p[,i])}
+cluster1_p <- as.matrix(cluster1_p)
+
+
+cluster1_log2FC <- cluster1_log2FC[order(rownames(cluster1_log2FC)),]
+
+cluster1_p <- cluster1_p[order(rownames(cluster1_p)),]
+
+# Plot heatmap
+png("/path/to/figures/Fig4L_Wnt_CyP.png", width = 300,height=700)
+pheatmap(cluster1_log2FC, breaks=seq(-1.5, 1.5, length.out=100),color=col_fun_rna(seq(0,1,length=100)),cluster_rows = F,cluster_cols = F,fontsize = 16,display_numbers = cluster1_p, cellwidth = 20,cellheight = 20)
+dev.off()
+```

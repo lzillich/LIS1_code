@@ -1,0 +1,197 @@
+---
+title: "Preprocessing Severe"
+author: "Anne Hoffrichter, Eric Poisel, Lea Zillich"
+date: "2021/11/23"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy.opts=list(width.cutoff=80),tidy=TRUE, fig.asp=0.5, fig.width=12, warning = FALSE)
+```
+
+```{r loadLibraries, message=FALSE, warning=FALSE}
+library(Seurat)
+library(ggplot2)
+library(cowplot)
+library(openxlsx)
+set.seed(42)
+```
+
+## Severe
+
+- Set up Severe object   
+```{r setUpSevereSeuratObject}
+Severe1.rawdata <- Read10X("path/to/raw_data/P6/filtered_feature_bc_matrix/")
+Severe2.rawdata <- Read10X("path/to/raw_data/P5/filtered_feature_bc_matrix/")
+Severe1Param <- read.table("path/to/001_filter_param_P6.txt")
+Severe2Param <- read.table("path/to/001_filter_param_P5.txt")
+
+Severe1 <- CreateSeuratObject(counts =Severe1.rawdata, min.cells = 3, min.features = Severe1Param$expr_features, project = "OK")
+Severe1$replicate <- "Severe1"
+Severe1[["percent.mt"]] <- PercentageFeatureSet(object = Severe1, pattern = "^MT-")
+
+Severe2 <- CreateSeuratObject(counts = Severe2.rawdata, min.cells = 3, min.features = Severe2Param$expr_features, project = "OK")
+Severe2$replicate <- "Severe2"
+Severe2[["percent.mt"]] <- PercentageFeatureSet(object = Severe2, pattern = "^MT-")
+```
+
+- Filter Severe cells
+  - by total counts
+  - by percent of mitochondrial genes expressed
+```{r filterSevereCells, message=FALSE}
+Severe1 <- subset(x=Severe1, subset= colSums(Severe1)>Severe1Param$total_counts & percent.mt <Severe1Param$MT)
+Severe2 <- subset(x=Severe2, subset= colSums(Severe2)>Severe2Param$total_counts & percent.mt <Severe2Param$MT)
+```
+
+- Additional QC steps
+  - SCTransform and add cell cycle annotation
+  - remove doublets
+  - integrate objects and generate clusters 
+```{r cellCycle, message=FALSE}
+
+#### Severe1 ####
+
+# SCTransform
+Severe1 <- SCTransform(
+  Severe1,
+  assay = 'RNA',
+  new.assay.name = 'SCT',
+  vars.to.regress = c('percent.mt', 'nFeature_RNA', 'nCount_RNA'),
+  verbose = F
+)
+
+# perform cell cycle scoring
+Severe1<- CellCycleScoring(
+  Severe1,
+  s.features = cc.genes$s.genes,
+  g2m.features = cc.genes$g2m.genes,
+  assay = 'SCT',
+  set.ident = TRUE
+)
+
+Severe1$CC.Difference <- Severe1$S.Score - Severe1$G2M.Score
+
+# second SCTransform step 
+Severe1 <- SCTransform(
+  Severe1,
+  assay = 'RNA',
+  new.assay.name = 'SCT',
+  vars.to.regress = c('percent.mt', 'nFeature_RNA', 'nCount_RNA', 'CC.Difference'),
+  verbose = F
+)
+
+#### Severe2 ####
+
+# SCTransform
+Severe2 <- SCTransform(
+  Severe2,
+  assay = 'RNA',
+  new.assay.name = 'SCT',
+  vars.to.regress = c('percent.mt', 'nFeature_RNA', 'nCount_RNA'),
+  verbose=FALSE
+)
+
+# perform cell cycle scoring
+Severe2<- CellCycleScoring(
+  Severe2,
+  s.features = cc.genes$s.genes,
+  g2m.features = cc.genes$g2m.genes,
+  assay = 'SCT',
+  set.ident = TRUE
+)
+
+Severe2$CC.Difference <- Severe2$S.Score - Severe2$G2M.Score
+
+# second SCTransform step 
+Severe2 <- SCTransform(
+  Severe2,
+  assay = 'RNA',
+  new.assay.name = 'SCT',
+  vars.to.regress = c('percent.mt', 'nFeature_RNA', 'nCount_RNA', 'CC.Difference'),
+  verbose = F
+)
+```
+
+```{r DoubletRemoval, message=FALSE}
+suppressMessages(require(DoubletFinder))
+
+# Estimated number of expected multiplets based on the number of analyzed cells (see https://nbisweden.github.io/workshop-scRNAseq/labs/compiled/seurat/seurat_01_qc.html)
+
+#Severe1: around 5000 cells prior to QC -> 3.9% doublets
+nExp1 <- round(ncol(Severe1) * 0.039)
+#Severe2: around 5000 cells prior to QC -> 3.9% doublets
+nExp2 <- round(ncol(Severe2) * 0.039)
+
+# Determine dimensionality of the dataset for doublet estimation 
+Severe1 <- RunPCA(Severe1, verbose = FALSE)
+Severe2 <- RunPCA(Severe2, verbose = FALSE)
+ElbowPlot(Severe1) # 15 PCs
+ElbowPlot(Severe2) # 15 PCs
+```
+
+```{r parameterOptimization, message=FALSE, include=FALSE}
+sweep.res1 <- paramSweep_v3(Severe1,sct = TRUE, PCs = 1:15) 
+sweep.stats1 <- summarizeSweep(sweep.res1, GT = FALSE) 
+bcmvn1 <- find.pK(sweep.stats1) 
+barplot(bcmvn1$BCmetric, names.arg = bcmvn1$pK, las=2)
+# maximum at pK = 0.05
+
+sweep.res2 <- paramSweep_v3(Severe2,sct = TRUE, PCs = 1:15) 
+sweep.stats2 <- summarizeSweep(sweep.res2, GT = FALSE) 
+bcmvn2 <- find.pK(sweep.stats2) 
+barplot(bcmvn2$BCmetric, names.arg = bcmvn2$pK, las=2)
+# maximum at pK = 0.08
+```
+
+```{r findDoublets1, message=FALSE, include = FALSE}
+Severe1 <- doubletFinder_v3(Severe1, pN = 0.25, pK = 0.05, nExp = nExp1, PCs = 1:15, sct = T)
+```
+
+```{r removeDoublets1, message=FALSE}
+DF.name1 = colnames(Severe1@meta.data)[grepl("DF.classification", colnames(Severe1@meta.data))]
+cowplot::plot_grid(ncol = 2, DimPlot(Severe1, group.by = "orig.ident") + NoAxes(), 
+    DimPlot(Severe1, group.by = DF.name1) + NoAxes())
+VlnPlot(Severe1, features = "nFeature_RNA", group.by = DF.name1, pt.size = 0.1)
+Severe1 = Severe1[, Severe1@meta.data[, DF.name1] == "Singlet"]
+```
+
+```{r findDoublets2, message=FALSE, include = FALSE}
+Severe2 <- doubletFinder_v3(Severe2, pN = 0.25, pK = 0.08, nExp = nExp2, PCs = 1:15, sct = T)
+```
+
+```{r removeDoublets2, message=FALSE}
+DF.name2 = colnames(Severe2@meta.data)[grepl("DF.classification", colnames(Severe2@meta.data))]
+cowplot::plot_grid(ncol = 2, DimPlot(Severe2, group.by = "orig.ident") + NoAxes(), 
+    DimPlot(Severe2, group.by = DF.name2) + NoAxes())
+VlnPlot(Severe2, features = "nFeature_RNA", group.by = DF.name2, pt.size = 0.1)
+Severe2 = Severe2[, Severe2@meta.data[, DF.name2] == "Singlet"]
+```
+
+```{r IntegrateObjectSevere}
+Severe.list <- list(Severe1,Severe2)
+
+options(future.globals.maxSize = 8000 * 1024^2)
+Severe.features <- SelectIntegrationFeatures(object.list = Severe.list)
+Severe.list <- PrepSCTIntegration(object.list = Severe.list, anchor.features = Severe.features, 
+    verbose = FALSE)
+
+Severe.anchors <- FindIntegrationAnchors(object.list = Severe.list, normalization.method = "SCT", 
+    anchor.features = Severe.features, verbose = FALSE)
+Severe.integrated <- IntegrateData(anchorset = Severe.anchors, normalization.method = "SCT", verbose = FALSE)
+
+Severe.integrated <- RunPCA(Severe.integrated, verbose = FALSE)
+Severe.integrated <- RunUMAP(Severe.integrated, reduction = "pca", dims = 1:50)
+Severe.integrated <- FindNeighbors(Severe.integrated, dims = 1:50, verbose = FALSE)
+Severe.integrated <- FindClusters(Severe.integrated, verbose = FALSE,resolution = 0.15)
+```
+
+- Save the objects after filtering and processing steps.
+```{r saveObjectsAfterGeneralFilteringSteps}
+saveRDS(Severe.integrated, "path/to/seurat_objects/Severe_integrated_sct.rds")
+```
+
+```{r sessioninfo}
+sessionInfo()
+```

@@ -1,0 +1,197 @@
+---
+title: "Preprocessing Ctrl"
+author: "Anne Hoffrichter, Eric Poisel, Lea Zillich"
+date: "2021/11/23"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy.opts=list(width.cutoff=80),tidy=TRUE, fig.asp=0.5, fig.width=12, warning = FALSE)
+```
+
+```{r loadLibraries, message=FALSE, warning=FALSE}
+library(Seurat)
+library(ggplot2)
+library(cowplot)
+library(openxlsx)
+set.seed(42)
+```
+
+## Ctrl
+
+- Set up Ctrl object   
+```{r setUpCtrlSeuratObject}
+Ctrl1.rawdata <- Read10X("path/to/raw_data/C1/filtered_feature_bc_matrix/")
+Ctrl2.rawdata <- Read10X("path/to/raw_data/C7/filtered_feature_bc_matrix/")
+Ctrl1Param <- read.table("path/to/001_filter_param_C1.txt")
+Ctrl2Param <- read.table("path/to/001_filter_param_C7.txt")
+
+Ctrl1 <- CreateSeuratObject(counts =Ctrl1.rawdata, min.cells = 3, min.features = Ctrl1Param$expr_features, project = "OK")
+Ctrl1$replicate <- "Ctrl1"
+Ctrl1[["percent.mt"]] <- PercentageFeatureSet(object = Ctrl1, pattern = "^MT-")
+
+Ctrl2 <- CreateSeuratObject(counts =Ctrl2.rawdata, min.cells = 3, min.features = Ctrl2Param$expr_features, project = "OK")
+Ctrl2$replicate <- "Ctrl2"
+Ctrl2[["percent.mt"]] <- PercentageFeatureSet(object = Ctrl2, pattern = "^MT-")
+```
+
+- Filter Ctrl cells
+  - by total counts
+  - by percent of mitochondrial genes expressed
+```{r filterCtrlCells, message=FALSE}
+Ctrl1 <- subset(x=Ctrl1, subset= colSums(Ctrl1)>Ctrl1Param$total_counts & percent.mt <Ctrl1Param$MT)
+Ctrl2 <- subset(x=Ctrl2, subset= colSums(Ctrl2)>Ctrl2Param$total_counts & percent.mt <Ctrl2Param$MT)
+```
+
+- Additional QC steps 
+  - SCTransform and add cell cycle annotation
+  - remove doublets
+  - integrate objects and generate clusters 
+```{r cellCycle, message=FALSE}
+
+#### Ctrl1 ####
+
+# SCTransform
+Ctrl1 <- SCTransform(
+  Ctrl1,
+  assay = 'RNA',
+  new.assay.name = 'SCT',
+  vars.to.regress = c('percent.mt', 'nFeature_RNA', 'nCount_RNA'),
+  verbose = F
+)
+
+# perform cell cycle scoring
+Ctrl1<- CellCycleScoring(
+  Ctrl1,
+  s.features = cc.genes$s.genes,
+  g2m.features = cc.genes$g2m.genes,
+  assay = 'SCT',
+  set.ident = TRUE
+)
+
+Ctrl1$CC.Difference <- Ctrl1$S.Score - Ctrl1$G2M.Score
+
+# second SCTransform step 
+Ctrl1 <- SCTransform(
+  Ctrl1,
+  assay = 'RNA',
+  new.assay.name = 'SCT',
+  vars.to.regress = c('percent.mt', 'nFeature_RNA', 'nCount_RNA', 'CC.Difference'),
+  verbose = F
+)
+
+#### Ctrl2 ####
+
+# SCTransform
+Ctrl2 <- SCTransform(
+  Ctrl2,
+  assay = 'RNA',
+  new.assay.name = 'SCT',
+  vars.to.regress = c('percent.mt', 'nFeature_RNA', 'nCount_RNA'),
+  verbose=FALSE
+)
+
+# perform cell cycle scoring
+Ctrl2<- CellCycleScoring(
+  Ctrl2,
+  s.features = cc.genes$s.genes,
+  g2m.features = cc.genes$g2m.genes,
+  assay = 'SCT',
+  set.ident = TRUE
+)
+
+Ctrl2$CC.Difference <- Ctrl2$S.Score - Ctrl2$G2M.Score
+
+# second SCTransform step 
+Ctrl2 <- SCTransform(
+  Ctrl2,
+  assay = 'RNA',
+  new.assay.name = 'SCT',
+  vars.to.regress = c('percent.mt', 'nFeature_RNA', 'nCount_RNA', 'CC.Difference'),
+  verbose = F
+)
+```
+
+```{r DoubletRemoval, message=FALSE}
+suppressMessages(require(DoubletFinder))
+
+# Estimated number of expected multiplets based on the number of analyzed cells (see https://nbisweden.github.io/workshop-scRNAseq/labs/compiled/seurat/seurat_01_qc.html)
+
+#Ctrl1: around 7000 cells prior to QC -> 5.4% doublets
+nExp1 <- round(ncol(Ctrl1) * 0.054)
+#Ctrl2: around 7000 cells prior to QC -> 5.4% doublets
+nExp2 <- round(ncol(Ctrl2) * 0.054)
+
+# Determine dimensionality of the dataset for doublet estimation 
+Ctrl1 <- RunPCA(Ctrl1, verbose = FALSE)
+Ctrl2 <- RunPCA(Ctrl2, verbose = FALSE)
+ElbowPlot(Ctrl1) # 15 PCs
+ElbowPlot(Ctrl2) # 15 PCs
+```
+
+```{r parameterOptimization, message=FALSE, include=FALSE}
+sweep.res1 <- paramSweep_v3(Ctrl1,sct = TRUE, PCs = 1:15) 
+sweep.stats1 <- summarizeSweep(sweep.res1, GT = FALSE) 
+bcmvn1 <- find.pK(sweep.stats1) 
+barplot(bcmvn1$BCmetric, names.arg = bcmvn1$pK, las=2)
+# maximum at pK = 0.07
+
+sweep.res2 <- paramSweep_v3(Ctrl2,sct = TRUE, PCs = 1:15) 
+sweep.stats2 <- summarizeSweep(sweep.res2, GT = FALSE) 
+bcmvn2 <- find.pK(sweep.stats2) 
+barplot(bcmvn2$BCmetric, names.arg = bcmvn2$pK, las=2)
+# maximum at pK = 0.05
+```
+
+```{r findDoublets1, message=FALSE, include=FALSE}
+Ctrl1 <- doubletFinder_v3(Ctrl1, pN = 0.25, pK = 0.07, nExp = nExp1, PCs = 1:15, sct = T)
+```
+
+```{r removeDoublets1, message=FALSE}
+DF.name1 = colnames(Ctrl1@meta.data)[grepl("DF.classification", colnames(Ctrl1@meta.data))]
+cowplot::plot_grid(ncol = 2, DimPlot(Ctrl1, group.by = "orig.ident") + NoAxes(), 
+    DimPlot(Ctrl1, group.by = DF.name1) + NoAxes())
+VlnPlot(Ctrl1, features = "nFeature_RNA", group.by = DF.name1, pt.size = 0.1)
+Ctrl1 = Ctrl1[, Ctrl1@meta.data[, DF.name1] == "Singlet"]
+```
+
+```{r findDoublets2, message=FALSE, include=FALSE}
+Ctrl2 <- doubletFinder_v3(Ctrl2, pN = 0.25, pK = 0.05, nExp = nExp2, PCs = 1:15, sct = T)
+```
+
+```{r removeDoublets2, message=FALSE}
+DF.name2 = colnames(Ctrl2@meta.data)[grepl("DF.classification", colnames(Ctrl2@meta.data))]
+cowplot::plot_grid(ncol = 2, DimPlot(Ctrl2, group.by = "orig.ident") + NoAxes(), 
+    DimPlot(Ctrl2, group.by = DF.name2) + NoAxes())
+VlnPlot(Ctrl2, features = "nFeature_RNA", group.by = DF.name2, pt.size = 0.1)
+Ctrl2 = Ctrl2[, Ctrl2@meta.data[, DF.name2] == "Singlet"]
+```
+
+```{r IntegrateObjectCtrl}
+Ctrl.list <- list(Ctrl1,Ctrl2)
+
+options(future.globals.maxSize = 8000 * 1024^2)
+Ctrl.features <- SelectIntegrationFeatures(object.list = Ctrl.list)
+Ctrl.list <- PrepSCTIntegration(object.list = Ctrl.list, anchor.features = Ctrl.features, 
+    verbose = FALSE)
+
+Ctrl.anchors <- FindIntegrationAnchors(object.list = Ctrl.list, normalization.method = "SCT", 
+    anchor.features = Ctrl.features, verbose = FALSE)
+Ctrl.integrated <- IntegrateData(anchorset = Ctrl.anchors, normalization.method = "SCT", verbose = FALSE)
+
+Ctrl.integrated <- RunPCA(Ctrl.integrated, verbose = FALSE)
+Ctrl.integrated <- RunUMAP(Ctrl.integrated, reduction = "pca", dims = 1:50)
+Ctrl.integrated <- FindNeighbors(Ctrl.integrated, dims = 1:50, verbose = FALSE)
+Ctrl.integrated <- FindClusters(Ctrl.integrated, verbose = FALSE,resolution = 0.2)
+```
+
+- Save the objects after filtering and processing steps.
+```{r saveObjectsAfterGeneralFilteringSteps}
+saveRDS(Ctrl.integrated, "path/to/seurat_objects/Ctrl_integrated_sct.rds")
+```
+
+```{r sessioninfo}
+sessionInfo()
+```
