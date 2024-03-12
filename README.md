@@ -1,5 +1,10 @@
-# Rossetti et al. - human cerebral organoid model of LIS1-lissencephaly
+# Zillich, Rossetti, Fechtner et al. - Unraveling LIS1-Lissencephaly
 
- R scripts for analysis of Rossetti et al. (2023) - Capturing the pathomechanisms of different disease severities in a human cerebral organoid model of LIS1-lissencephaly
- https://www.biorxiv.org/content/10.1101/2022.12.19.520907v1
+ R scripts for all analyses - Unraveling LIS1-Lissencephaly: Insights from Cerebral Organoids Suggest Genotype-Phenotype Correlations, Molecular Mechanisms and Therapeutic Strategies
+
+1_organoid_quantifications contains all statistical analyses and figures related to ventricular zone (VZ) parameters, niche disruption quantifications, actin-tublin measurements and plane of cell divisions
+2_scRNA-seq contains all analyses and figures related to the single-cell RNA sequencing of 2 control- and 6 patient-derived organoids 
+3_protein contains all analyses performed on mass spectromotery data from homogeneous radial glia populations
+
+Link to deposited raw data will follow.
  
