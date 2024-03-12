@@ -95,7 +95,7 @@ full.integrated@meta.data$seurat_clusters[which(row.names(full.integrated@meta.d
 
 - Rename Clusters
 ```{r rename clusters}
-new.cluster.ids <- c("RG", "CyP", "G", "PP", "dFB-N", "NES", "vFB-N", "IN", "MB-N", "IP")
+new.cluster.ids <- c("RG", "CyP", "G", "t-RG", "dFB-N", "NE", "vFB-N", "IN", "MB-N", "IP")
 names(new.cluster.ids) <- levels(full.integrated)
 full.integrated <- RenameIdents(full.integrated, new.cluster.ids)
 full.integrated@meta.data$cell_types <- full.integrated@active.ident
