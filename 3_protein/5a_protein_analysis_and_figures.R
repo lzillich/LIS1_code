@@ -1,6 +1,6 @@
 # Analysis of protein data
 # Lea Zillich 
-# created: 16.11.2023
+# last update 20.01.2025
 
 setwd("/path/to/")
 
@@ -16,11 +16,16 @@ library(enrichplot)
 library(rstatix)
 library(colorRamp2)
 library(ggpubr)
-library(ComplexHeatmap)
-library(pheatmap)
 
 col_fun_rna = colorRamp2(c(0,0.25, 0.5,0.75, 1), c("#1B4D68","#28739C","#E4E4E4","#F7AB64","#C7361B"))
 col_fun_prot = colorRamp2(c(0,0.25,0.5,0.75,1), c("#003E65","#3A98CC","#E4E4E4","#FCD8C1","#F7AB64"))
+
+
+#Loading data
+prot <- read_excel("1_Raw_data/protein/Std-QExactive01-06361_1-Ctrl-28#4-d16.2.xlsx", 
+              sheet = "Calculations")
+#prot <- prot[,c(1:4,26:29,31:36)]
+#write.table(prot$Accession, "1_Raw_data/protein/protein_ids.csv", sep=",", row.names = F, quote = F,col.names = F)
 
 #load annotations
 UniProt_to_Ensembl <- read_table2("1_Raw_data/protein/UniProt_to_Ensembl.tsv")
@@ -86,7 +91,7 @@ count <- count[,1:1648]
 count$condition <- as.factor(c("control","control","control","control","mild","mild","mild","mild","moderate","moderate",
                      "moderate","moderate","moderate","moderate","severe","severe","severe","severe","severe","severe"))
 
-save(count, file="WGCNA/log_counts.Rdata")
+#save(count, file="WGCNA/log_counts.Rdata")
 
 nprot <- length(prot$Accession)
 
@@ -187,7 +192,7 @@ write.table(prot_GO_MF@compareClusterResult, file="/path/to/protein_results/GO_M
 prot_GO_CC <- compareCluster(geneClusters = GO_prot_list,fun = "enrichGO",OrgDb = org.Hs.eg.db,pvalueCutoff=0.25,ont="CC")
 ggsave("/path/to/protein_results/GO_prots_CC.pdf",p3,height=8,width=10)
 
-write.table(prot_GO_CC@compareClusterResult, file="/path/to/protein_results/GO_CC.csv", sep = ",")
+write.table(prot_GO_CC@compareClusterResult, file="/path/to//protein_results/GO_CC.csv", sep = ",")
 
 #"#F184A7","#E8326D", "#F7AB64","#BE154C","#006960","#D1BCDC","#428E77","#74BA59","#BFE1D7","#21473C"
 #"#C7361B","#F7AB64", "#313C48","#880000","#006960","#FCD8C1","#428E77","#778CA1","#BFE1D7","#21473C"
@@ -308,19 +313,22 @@ p11 <- ggplot(plot_cyto,aes(x=condition,y=logP, fill=Cluster))+ ylim(0, 10) +
    theme_classic() + theme(text=element_text(size=14), legend.position = "none") + labs(title="cytoskeleton constituent",  x="condition", y = "-log10(p)") + scale_x_discrete(labels= c("mild","moderate","severe"))
 
 
+ggsave("/path/to/figures/GO_arrange_test.pdf",
+       ggarrange(p7,ggarrange(p8,p9,p10,p11,ncol=2,nrow=2),nrow=2, heights=c(0.3,0.7),common.legend = T, legend="bottom"),
+       width = 6, height = 8)
 
-ggsave("/zi-flstorage/group_genepi/shared-scRNAseq/1_Projekt_Andrea/figures/Fig3A.pdf",
+ggsave("/path/to/figures/GO_actin_test.pdf",
        ggarrange(p8,p9,p10,p11,nrow=1,common.legend = T, legend="bottom"),
        width = 6, height = 6)
 
-ggsave("/zi-flstorage/group_genepi/shared-scRNAseq/1_Projekt_Andrea/figures/GO_cadherin.pdf",
+ggsave("/path/to/figures/GO_cadherin.pdf",
        p7,width = 3.5, height = 4)
 
 
 
 #Heatmap
 #prepare count data for heatmap
-heatmap <- read_excel("protein/prots_genes_for_heatmap.xlsx")
+heatmap <- read_excel("1_Raw_data/protein/prots_genes_for_heatmap.xlsx")
 
 library(tidyr)
 #get p values
@@ -341,6 +349,7 @@ all_mod <- all_mod[order(all_mod$...1),]
 all_sev <- all_sev[all_sev$...1 %in%heatmap$name,]
 all_sev <- all_sev[order(all_sev$...1),]
 
+library(ComplexHeatmap)
 
 names_heat <- UniProt_to_GeneID
 
@@ -362,9 +371,10 @@ colnames(p_mat) <- c("mild", "moderate","severe")
 p_mat[,1] <- stars_gen(p_mat[,1])
 p_mat[,2] <- stars_gen(p_mat[,2])
 p_mat[,3] <- stars_gen(p_mat[,3])
+
 p_mat <- as.matrix(p_mat)
 
-
+library(pheatmap)
 pdf("/path/to/figures/Heatmap_LIS1_interaction.pdf",height = 16,width = 8)
 pheatmap(z_mat,color = col_fun_rna(seq(0,1,length=100)),cluster_rows = F,cluster_cols = F,fontsize = 16, angle_col = "45",cellwidth = 20,cellheight = 20,display_numbers = p_mat)
 dev.off()
@@ -373,6 +383,7 @@ dev.off()
 z_rna <- data.frame(z_mild=round(all_mild$avg_log2FC,2),z_moderate=all_mod$avg_log2FC,z_severe=all_sev$avg_log2FC)
 rownames(z_rna) <- all_mild$...1
 colnames(z_rna) <- c("mild", "moderate","severe")
+
 z_rna <- as.matrix(z_rna)
 
 p_rna <- data.frame(p_mild=all_mild$p_val,p_moderate=all_mod$p_val,p_severe=all_sev$p_val)
@@ -381,9 +392,10 @@ colnames(p_rna) <- c("mild", "moderate","severe")
 p_rna[,1] <- stars_gen(p_rna[,1])
 p_rna[,2] <- stars_gen(p_rna[,2])
 p_rna[,3] <- stars_gen(p_rna[,3])
+
 p_rna <- as.matrix(p_rna)
 
-pdf("/path/to/figures/Heatmap_LIS1_interaction_RNA.pdf",height = 16,width = 8)
+pdf("/path/to//figures/Heatmap_LIS1_interaction_RNA.pdf",height = 16,width = 8)
 pheatmap(z_rna,color = col_fun_rna(seq(0,1,length=100)),cluster_rows = F,cluster_cols = F,fontsize = 16, angle_col = "45",cellwidth = 20,cellheight = 20,display_numbers = p_rna)
 dev.off()
 
@@ -411,11 +423,11 @@ rownames(hm_DEG) <- results_heatmap$SYMBOL
 colnames(hm_DEG) <- c("mild","moderate","severe")
 
 #reorder the rows to match with annotation labels
+library(ComplexHeatmap)
 
 # subset genes for labeling in the heatmap
 lab <- rownames(hm_DEG)
 lab_genes <- c(mild_top10,moderate_top10,severe_top10)
-
 #remove mitochondrial genes, pseudogenes and XIST
 
 lab_genes <- lab_genes[-grep("RPS|RPL|XIST|MT-|AC|AL",lab_genes)]
@@ -423,7 +435,7 @@ lab[!(lab %in% lab_genes)] <- ""
 lab_genes <- unique(lab_genes)
 
 # Plot heatmap
-pdf("/path/to/figures/SupFig3E_protein_hm.pdf",width=3.5,height=3)
+pdf("/path/to/figures/protein_hm.pdf",width=3.5,height=3)
 Heatmap(hm_DEG,name="r",col=col_fun_prot(seq(0,1,length=20)),show_row_dend=F,cluster_columns = FALSE,column_names_gp  = gpar(fontsize=8),column_names_rot = 45) + rowAnnotation(link = anno_mark(at = which(rownames(hm_DEG)==lab), 
                                                                                                                                                   labels = lab[lab !=""], padding = unit(1, "mm"),link_gp = gpar(lwd = 0.1) ,labels_gp = gpar(fontsize = 6)))
 dev.off()

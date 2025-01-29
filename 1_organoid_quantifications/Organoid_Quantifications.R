@@ -1,5 +1,5 @@
 # morphological analyses 
-# last update: 01.03.24
+# last update: 20.01.25
 
 library(readr)
 library(data.table)
@@ -7,7 +7,7 @@ library(readxl)
 library(ggplot2)
 library(ggpubr)
 
-setwd("/path/to")
+setwd("/path/to/organoid_quantifications/LZ")
 
 loop <- read_excel("loop_parameters.xlsx", 
                                  sheet = "loop_sum")
@@ -19,19 +19,19 @@ loop <- read_excel("loop_parameters.xlsx",
 kruskal.test(loop$VZ_dia_mean~loop$condition)
 pairwise.wilcox.test(loop$VZ_dia_mean,loop$condition, p.adjust="bonferroni")
 
-com_con <- list( c("control", "mild"), c("control", "moderate"), c("control", "severe") )
+com_con <- list(c("control", "mild"), c("control", "moderate"), c("control", "severe"), c("mild", "moderate"),c("mild", "severe"), c("moderate", "severe"))
 
 p1 <- ggplot(loop,aes(x=condition, y=VZ_dia_mean, fill=condition)) +
   geom_boxplot() +
   geom_jitter(color="black", position=position_jitter(0.1)) +
   theme_classic() +
-  ylim(0,100) +
+  ylim(0,110) +
   xlab("") + labs(y="µm") + 
   theme(text = element_text(size=18),axis.title.x=element_blank(), axis.text.y=element_text(size=18, colour="black"),axis.text.x=element_text(size=18, colour="black"), axis.ticks.x = element_blank(),legend.position = "none") +   
   scale_fill_manual(values=c("#FFFFFF","#BFBFBF","#7F7F7F","#414354")) + 
-  stat_compare_means(comparisons = com_con)
+  stat_compare_means(comparisons = list( c("control", "mild"), c("control", "moderate"), c("control", "severe"), c("mild", "severe")))
 
-ggsave(file="figures/Fig1D_VZ_diameter.pdf",p1, width = 5.5, height = 4)
+ggsave(file="/path/to/figures/VZ_diameter_rev.pdf",p1, width = 5.5, height = 5)
 
 #ventricle size
 kruskal.test(loop$ven_size_mean~loop$condition)
@@ -50,10 +50,10 @@ p2 <- ggplot(loop,aes(x=condition, y=ven_size_mean, fill=condition)) +
   xlab("") + labs(y=bquote("µm"^2)) + 
   theme(text = element_text(size=18),axis.title.x=element_blank(), axis.text.y=element_text(size=18, colour="black"),axis.text.x=element_text(size=18, colour="black"), axis.ticks.x = element_blank(),legend.position = "none") +   
   scale_fill_manual(values=c("#FFFFFF","#BFBFBF","#7F7F7F","#414354")) + 
-  stat_compare_means(comparisons = com_ven)
+  stat_compare_means(comparisons = list( c("control", "moderate"), c("control", "severe"),c("mild", "severe"), c("moderate", "severe")))
 
 
-ggsave(file="figures/SupFig1D_venlike.pdf",p2, width = 5.5, height = 4)
+ggsave(file="/path/to/figures/venlike.pdf",p2, width = 5.5, height = 5)
 
 #apical membrane length
 kruskal.test(loop$ap_mem_mean~loop$condition)
@@ -70,10 +70,9 @@ p3 <- ggplot(loop,aes(x=condition, y=ap_mem_mean, fill=condition)) +
   xlab("") + labs(y="µm") + 
   theme(text = element_text(size=18),axis.title.x=element_blank(), axis.text.y=element_text(size=18, colour="black"),axis.text.x=element_text(size=18, colour="black"), axis.ticks.x = element_blank(),legend.position = "none") +   
   scale_fill_manual(values=c("#FFFFFF","#BFBFBF","#7F7F7F","#414354"))+ 
-  stat_compare_means(comparisons = com_con)
+  stat_compare_means(comparisons = list(c("control", "mild"), c("control", "moderate"), c("control", "severe"),c("mild", "severe")))
 
-
-ggsave(file="figures/Figure1E_apical_membrane_length.pdf",p3, width = 5.5, height = 4)
+ggsave(file="/path/to/figures/apical_membrane_length_rev.pdf",p3, width = 5.5, height = 5)
 
 #total loop size
 kruskal.test(loop$tot_loop_mean~loop$condition)
@@ -90,10 +89,9 @@ p4 <- ggplot(loop,aes(x=condition, y=tot_loop_mean, fill=condition)) +
   xlab("") + labs(y=bquote("µm"^2))  + 
   theme(text = element_text(size=18),axis.title.x=element_blank(), axis.text.y=element_text(size=18, colour="black"),axis.text.x=element_text(size=18, colour="black"), axis.ticks.x = element_blank(),legend.position = "none") +   
   scale_fill_manual(values=c("#FFFFFF","#BFBFBF","#7F7F7F","#414354")) + 
-  stat_compare_means(comparisons = com_ven)
+  stat_compare_means(comparisons = list(c("control", "severe"),c("mild", "severe"), c("moderate", "severe")))
 
-
-ggsave(file="figures/SuppFig1G_total_VZ_area.pdf",p4, width = 5.5, height = 4)
+ggsave(file="/path/to/figures/total_VZ_area.pdf",p4, width = 5.5, height = 5)
 
 #basal membrane length
 kruskal.test(loop$bas_mem_mean~loop$condition)
@@ -110,10 +108,10 @@ p5 <- ggplot(loop,aes(x=condition, y=bas_mem_mean, fill=condition)) +
   xlab("") + labs(y="µm") + 
   theme(text = element_text(size=18),axis.title.x=element_blank(), axis.text.y=element_text(size=18, colour="black"),axis.text.x=element_text(size=18, colour="black"), axis.ticks.x = element_blank(),legend.position = "none") +   
   scale_fill_manual(values=c("#FFFFFF","#BFBFBF","#7F7F7F","#414354")) + 
-  stat_compare_means(comparisons = com_ven)
+  stat_compare_means(comparisons = list( c("control", "moderate"), c("control", "severe")))
 
 
-ggsave(file="figures/SuppFig1C_basal_membrane_length.pdf",p5, width = 5.5, height = 4)
+ggsave(file="/path/to/figures/basal_membrane_length.pdf",p5, width = 5.5, height = 5)
 
 
 #loop area
@@ -131,10 +129,10 @@ p6 <- ggplot(loop,aes(x=condition, y=loop_area_mean, fill=condition)) +
   xlab("") + labs(y=bquote("µm"^2))  + 
   theme(text = element_text(size=18),axis.title.x=element_blank(), axis.text.y=element_text(size=18, colour="black"),axis.text.x=element_text(size=18, colour="black"), axis.ticks.x = element_blank(),legend.position = "none") +   
   scale_fill_manual(values=c("#FFFFFF","#BFBFBF","#7F7F7F","#414354")) + 
-  stat_compare_means(comparisons = com_ven)
+  stat_compare_means(comparisons = list(c("control", "severe"),c("mild", "severe"), c("moderate", "severe")))
 
 
-ggsave(file="figures/SupFig1F_VZ_loop_area.pdf",p6, width = 5.5, height = 4)
+ggsave(file="/path/to/figures/VZ_loop_area.pdf",p6, width = 5.5, height = 5)
 
 
 #Ac-TUB - Figure 3C
@@ -159,7 +157,7 @@ p7 <- ggplot(data=bar, aes(x=condition, y=mean_dens, fill=interaction(type,condi
   scale_fill_manual(values=c("#FFFFFF","#DBEAD5","#BFBFBF","#B7D5Ac","#7F7F7F","#6EAA5E","#414354","#469536"))+
   theme(text = element_text(size = 20,colour="black"),legend.position="none") 
 
-ggsave("figures/actin-tubulin_fig3c.pdf",p7,width=6, height=4)
+ggsave("/path/to/figures/actin-tubulin.pdf",p7,width=6, height=4)
 
 
 #N-Cad signal Figure 3E
@@ -175,13 +173,13 @@ p8 <- ggplot(ncad,aes(x=condition, y=ncad, fill=condition)) +
   geom_boxplot() +
   geom_jitter(color="black", position=position_jitter(0.1)) +
   theme_classic() +
-  ylim(0,65) +
+  #ylim(0,65) +
   xlab("") + labs(y="apical NCAD signal (µm)") + 
   theme(text = element_text(size=18),axis.title.x=element_blank(), axis.text.y=element_text(size=18, colour="black"),axis.text.x=element_text(size=18, colour="black"), axis.ticks.x = element_blank(),legend.position = "none") +   
   scale_fill_manual(values=c("#FFFFFF","#BFBFBF","#7F7F7F","#414354")) + 
-  stat_compare_means(comparisons = com_con, method = "wilcox")
+  stat_compare_means(comparisons = list(c("control", "mild"), c("control", "moderate"), c("control", "severe"), c("mild", "moderate"),c("mild", "severe"), c("moderate", "severe")), method = "wilcox")
 
-ggsave("figures/ncad_signal_fig3e.pdf",p8,width = 5,height=4.5)
+ggsave("/path/to/figures/ncad_signal.pdf",p8,width = 5,height=4.5)
 
 #dividing cells Figure 3K
 div <- read_excel("plane_of_cell_division.xlsx", 
@@ -202,7 +200,7 @@ p9 <-ggplot(data=div_bar, aes(x=condition, y=mean, fill=type)) +
     scale_pattern_fill_manual(values = c("#BFBFBF","#BFBFBF","#BFBFBF"))+ylab("dividing aRG cells (%)") +
   theme(text = element_text(size = 20,colour="black"))
 
-ggsave("figures/dividing_3k.pdf", p9, width = 7,height = 6)
+ggsave("/path/to/figures/dividing.pdf", p9, width = 7,height = 6)
   
 ###### QUANTIFICATIONS RESCUE #######
 
@@ -224,7 +222,7 @@ loop_epo$inter <- factor(loop_epo$inter,levels = c("control DMSO","control EpoD"
 
 ### CHIR ###
 
-#VZ thickness
+#VZ diameter
 kruskal.test(loop_CHIR$VZ_dia_mean~loop_CHIR$inter)
 wilcox.test(loop_CHIR$VZ_dia_mean[loop_CHIR$condition=="control"]~loop_CHIR$treat[loop_CHIR$condition=="control"])
 wilcox.test(loop_CHIR$VZ_dia_mean[loop_CHIR$condition=="mild"]~loop_CHIR$treat[loop_CHIR$condition=="mild"])
@@ -238,12 +236,12 @@ p13a <- ggplot(loop_CHIR,aes(x=inter, y=VZ_dia_mean, fill=inter)) +
   geom_jitter(color="black", position=position_jitter(0.1)) +
   theme_classic() +
   ylim(0,80) +
-  xlab("") + labs(y="VZ  thickness (µm)") + 
+  xlab("") + labs(y="VZ  diameter (µm)") + 
   theme(text = element_text(size=18),axis.title.x=element_blank(), axis.text.y=element_text(size=18, colour="black"),axis.text.x=element_blank(), axis.ticks.x = element_blank(),legend.position = "none") +   
   scale_fill_manual(values=c("#FFFFFF","#E5E5FF","#BFBFBF","#B2B2FF","#7F7F7F","#7F7FFF","#414354","#6666FF")) + 
   stat_compare_means(comparisons = com_chir, method = "wilcox")
 
-ggsave("figures/Figure_4G.pdf",p13a, width = 6, height =5)
+ggsave("/path/to/figures/Figure_S4G.pdf",p13a, width = 6, height =5)
 
 #apical membrane length
 kruskal.test(loop_CHIR$ap_mem~loop_CHIR$inter)
@@ -332,13 +330,13 @@ p13f <- ggplot(loop_CHIR,aes(x=inter, y=loop_tis, fill=inter)) +
 
 p13sup <- ggarrange(p13b,p13c,p13d,p13e,nrow=2,ncol=2,common.legend = T)
 
-ggsave("figures/sup4C.pdf",p13sup, width=14, height=12)
+ggsave("/path/to/figures/SupS4F.pdf",p13sup, width=14, height=12)
 
 ##### EpoD ####
 
 com_epo <- list( c("control DMSO", "control EpoD"), c("mild DMSO", "mild EpoD"), c("moderate DMSO", "moderate EpoD"), c("severe DMSO","severe EpoD"))
 
-#VZ thickness
+#VZ diameter
 kruskal.test(loop_epo$VZ_dia_mean~loop_epo$inter)
 wilcox.test(loop_epo$VZ_dia_mean[loop_epo$condition=="control"]~loop_epo$treat[loop_epo$condition=="control"])
 wilcox.test(loop_epo$VZ_dia_mean[loop_epo$condition=="mild"]~loop_epo$treat[loop_epo$condition=="mild"])
@@ -351,12 +349,12 @@ p14 <- ggplot(loop_epo,aes(x=inter, y=VZ_dia_mean, fill=inter)) +
   geom_jitter(color="black", position=position_jitter(0.1)) +
   theme_classic() +
   ylim(0,90) +
-  xlab("") + labs(y="VZ  thickness (µm)") + 
+  xlab("") + labs(y="VZ  diameter (µm)") + 
   theme(text = element_text(size=18),axis.title.x=element_blank(), axis.text.y=element_text(size=18, colour="black"),axis.text.x=element_blank(), axis.ticks.x = element_blank()) +   
   scale_fill_manual(values=c("#FFFFFF","#DBEAD5","#BFBFBF","#B7D5Ac","#7F7F7F","#6EAA5E","#414354","#469536")) + 
   stat_compare_means(comparisons = com_epo, method = "wilcox")
 
-ggsave("figures/Figure_4B.pdf",p14, width = 6, height =4)
+ggsave("/path/to/figures/epo_VZ_diameter.pdf",p14, width = 6, height =4)
 
 #apical membrane length
 kruskal.test(loop_epo$ap_mem~loop_epo$inter)
@@ -446,7 +444,7 @@ p14f <- ggplot(loop_epo,aes(x=inter, y=loop_tis, fill=inter)) +
 
 p14sup <- ggarrange(p14b,p14c,p14d,p14e,nrow=2,ncol=2,common.legend = T)
 
-ggsave("figures/Sup4B.pdf",p14sup,width=14, height=12)
+ggsave("figures/Sup4G.pdf",p14sup,width=14, height=12)
 
 #Figure 4A - AC TUB density
 epod_plot <- read_excel("ac_tub.xlsx", 
@@ -470,7 +468,7 @@ p11 <- ggplot(data=epod_plot, aes(x=condition, y=mean, fill=interaction(treat,co
   scale_fill_manual(values=c("#FFFFFF","#DBEAD5","#BFBFBF","#B7D5Ac","#7F7F7F","#6EAA5E","#414354","#469536")) +
   theme(text = element_text(size = 20,colour="black"),legend.position="none")
 
-ggsave("figures/Fig4A.pdf",p11,width=6,height=5)
+ggsave("figures/epod_bml.pdf",p11,width=6,height=5)
 
 
 #CHIR rescue - dividing cells
@@ -498,7 +496,7 @@ p12 <- ggplot(data=chir_bar, aes(x=inter, y=perc_div, fill=type)) +
   scale_pattern_fill_manual(values = c("#FFFFFF","#E5E5FF","#BFBFBF","#B2B2FF","#7F7F7F","#7F7FFF","#414354","#6666FF"))+
   theme(text = element_text(size = 20,colour="black"),axis.text.x = element_blank(),legend.position="none") + xlab("")
 
-ggsave("figures/Figure4H.pdf",p12, width = 7,height = 5)
+ggsave("figures/CHIR_plane_cell_division.pdf",p12, width = 7,height = 5)
 
 
 #NCAD signal - rescue
@@ -543,6 +541,6 @@ p15b <- ggplot(ncad_res,aes(x=inter, y=ncad, fill=inter)) +
   stat_compare_means(comparisons = com_epo, method = "wilcox")
 
 
-ggsave("figures/Figure_4D.pdf",p15a, width = 6, height =5)
+ggsave("figures/epod_ncad.pdf",p15a, width = 6, height =5)
 
 

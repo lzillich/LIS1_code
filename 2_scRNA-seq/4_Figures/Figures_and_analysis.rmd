@@ -1,6 +1,6 @@
 ---
 title: "Figures & Analyses"
-author: "Lea Zillich, Anne Hoffrichter, Eric Zillich"
+author: "Lea Zillich, Anne Hoffrichter, Eric Poisel"
 date: "2022/02/17"
 output:
   html_document:
@@ -18,8 +18,7 @@ library(cowplot)
 library(openxlsx)
 library(dplyr)
 library(readxl)
-library(fgsea)
-library(msigdb)
+#library(msigdb)
 library(enrichR)
 library(msigdbr)
 library(org.Hs.eg.db)
@@ -34,7 +33,8 @@ set.seed(42)
 
 - Import integrated object
 ```{r importObject}
-sc <- readRDS(file = "path/to/seurat_objects/LIS1_integrated.rds")
+sc <- readRDS(file = "/path/to/4_SeuratObjects/LIS1_integrated.rds")
+#sc <- readRDS(file = "path/to/4_SeuratObjects/LIS1_integrated.rds")
 ```
 
 ```{r normalize data}
@@ -52,26 +52,35 @@ sc <- ScaleData(sc, features = rownames(sc), assay = "RNA")
 ```{r DimPLots data}
 p1 <- DimPlot(sc, reduction = "umap",  cols = c("#C7361B","#F7AB64", "#313C48","#880000","#006960","#FCD8C1","#428E77","#778CA1","#BFE1D7","#21473C"))
 
-ggsave("/path/to/figures/Fig2b_DimPlot.png", p1, width= 7, height = 5, dpi=600)
+ggsave("/path/to/figures/DimPlot.png", p1, width= 7, height = 5, dpi=600)
 
 p2 <- DimPlot(sc, reduction = "umap",  split.by = "replicate",cols = c("#C7361B","#F7AB64", "#313C48","#880000","#006960","#FCD8C1","#428E77","#778CA1","#BFE1D7","#21473C"),ncol=4)
 
 
-ggsave("/path/to/figures/SupFig2A_DimPlot_by_replicate.pdf", p2, width= 9, height = 6, dpi=600)
+#ggsave("/path/to/figures/DimPlot_by_replicate.pdf", p2, width= 9, height = 6, dpi=600)
 
 p1
 p2
 ```
 
+
+```{r FeaturePLots NE}
+
+p3 <- FeaturePlot(sc, features=c("ZBTB16", "MMRN1","NR2F1","BTBD17"))
+
+
+p3
+```
+
 - Figure 2C
 
 ```{r celltypes stacked}
-samples <- c(rep("Ctrl" , 10) , rep("Mild" , 10), rep("Moderate" , 10), rep("Severe" , 10))
+samples <- c(rep("Ctrl_C1" , 10),rep("Ctrl_C7" , 10) , rep("Mild_P1" , 10), rep("Mild_P2" , 10), rep("Moderate_P3" , 10), rep("Moderate_P4" , 10), rep("Severe_P5" , 10), rep("Severe_P6" , 10))
 
-celltypes <- rep(names(table(sc$cell_types)) , 4)
-prop <- table(sc$condition,sc$cell_types)
+celltypes <- rep(names(table(sc$cell_types)) , 8)
+prop <- table(sc$replicate,sc$cell_types)
 
-value <- c(unname(prop[1,]),unname(prop[2,]),unname(prop[3,]),unname(prop[4,]))
+value <- c(unname(prop[1,]),unname(prop[2,]),unname(prop[3,]),unname(prop[4,]),unname(prop[5,]),unname(prop[6,]),unname(prop[7,]),unname(prop[8,]))
 
 cell_perc <- data.frame(samples,celltypes,value)
 cell_perc$celltypes <- factor(cell_perc$celltypes, levels =c("IP","vFB-N","dFB-N","MB-N","IN","G","t-RG","RG","CyP","NE"))
@@ -82,7 +91,10 @@ cell_perc$samples <- factor(cell_perc$samples)
 per <- ggplot(cell_perc, aes(fill=celltypes, y=value, x=samples)) + 
     geom_bar(position="fill", stat="identity")+scale_fill_manual(values=c("#21473C","#428E77","#006960","#BFE1D7","#778CA1","#313C48", "#880000","#C7361B","#F7AB64","#FCD8C1"))+ylab("celltype proportion")+xlab(NULL)+
   theme_void()+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1), axis.text.y = element_text(), axis.title.y = element_text(angle = 90,vjust=1))
-ggsave(plot = per,filename ="path/to/figures/Fig2C_celltype_percentage.pdf", width = 3, height=5)
+ggsave(plot = per,filename ="/path/to/figures/celltype_percentage_revision.pdf", width = 3, height=5)
+
+
+
 ```
 
 
@@ -90,23 +102,38 @@ ggsave(plot = per,filename ="path/to/figures/Fig2C_celltype_percentage.pdf", wid
 ## Supplementary Figures 3C
 
 ```{r sut-RG fig 3c 3d, warning=FALSE, message=FALSE, results='hide'}
-cell_perc$percent <- c(cell_perc$value[cell_perc$samples=="Ctrl"]/sum(cell_perc$value[cell_perc$samples=="Ctrl"]),
-                       cell_perc$value[cell_perc$samples=="Mild"]/sum(cell_perc$value[cell_perc$samples=="Mild"]),
-                       cell_perc$value[cell_perc$samples=="Moderate"]/sum(cell_perc$value[cell_perc$samples=="Moderate"]),
-                       cell_perc$value[cell_perc$samples=="Severe"]/sum(cell_perc$value[cell_perc$samples=="Severe"]))
+condition <- c(rep("Ctrl" , 10),rep("Mild" , 10),rep("Moderate" , 10), rep("Severe" , 10))
+
+celltypes <- rep(names(table(sc$cell_types)) , 4)
+prop <- table(sc$condition,sc$cell_types)
+
+value <- c(unname(prop[1,]),unname(prop[2,]),unname(prop[3,]),unname(prop[4,]))
+
+cell_perc <- data.frame(condition,celltypes,value)
+cell_perc$celltypes <- factor(cell_perc$celltypes, levels =c("IP","vFB-N","dFB-N","MB-N","IN","G","t-RG","RG","CyP","NE"))
+     
+cell_perc$condition<- factor(cell_perc$condition)
+
+
+cell_perc$percent <- c(cell_perc$value[cell_perc$condition=="Ctrl"]/sum(cell_perc$value[cell_perc$condition=="Ctrl"]),
+                       cell_perc$value[cell_perc$condition=="Mild"]/sum(cell_perc$value[cell_perc$condition=="Mild"]),
+                       cell_perc$value[cell_perc$condition=="Moderate"]/sum(cell_perc$value[cell_perc$condition=="Moderate"]),
+                       cell_perc$value[cell_perc$condition=="Severe"]/sum(cell_perc$value[cell_perc$condition=="Severe"]))
 
 cell_prog <- data.frame(condition=rep(c("Ctrl","Mild","Moderate","Severe"),2),
                         type=c(rep("Progenitor",4),rep("Differentiated Cells",4)),
-                        perc=c(sum(cell_perc$percent[cell_perc$samples=="Ctrl"& (cell_perc$celltypes=="RG"|cell_perc$celltypes=="t-RG"|cell_perc$celltypes=="NE")]),sum(cell_perc$percent[cell_perc$samples=="Mild"& (cell_perc$celltypes=="RG"|cell_perc$celltypes=="t-RG")]), sum(cell_perc$percent[cell_perc$samples=="Moderate"&  (cell_perc$celltypes=="RG" |cell_perc$celltypes=="t-RG"|cell_perc$celltypes=="NE")]), sum(cell_perc$percent[cell_perc$samples =="Severe"& (cell_perc$celltypes=="RG"|cell_perc$celltypes=="t-RG"|cell_perc$celltypes=="NE")]), sum(cell_perc$percent[cell_perc$samples=="Ctrl"& (cell_perc$celltypes =="dFB-N" |cell_perc$celltypes=="vFB-N"|cell_perc$celltypes=="MB-N"|cell_perc$celltypes=="IN"|cell_perc$celltypes=="G")]),sum(cell_perc$percent[cell_perc$samples=="Mild"& (cell_perc$celltypes=="dFB-N" |cell_perc$celltypes=="vFB-N"|cell_perc$celltypes=="MB-N"|cell_perc$celltypes=="IN"|cell_perc$celltypes=="G")]), sum(cell_perc$percent[cell_perc$samples=="Moderate"& (cell_perc$celltypes=="dFB-N" |cell_perc$celltypes=="vFB-N"|cell_perc$celltypes=="MB-N"|cell_perc$celltypes=="IN"|cell_perc$celltypes=="G")]),sum(cell_perc$percent[cell_perc$samples=="Severe"& (cell_perc$celltypes=="dFB-N" |cell_perc$celltypes=="vFB-N"|cell_perc$celltypes=="MB-N"|cell_perc$celltypes=="IN"|cell_perc$celltypes=="G")])))
+                        perc=c(sum(cell_perc$percent[cell_perc$condition=="Ctrl"& (cell_perc$celltypes=="RG"|cell_perc$celltypes=="t-RG"|cell_perc$celltypes=="NE")]),sum(cell_perc$percent[cell_perc$condition=="Mild"& (cell_perc$celltypes=="RG"|cell_perc$celltypes=="t-RG")]), sum(cell_perc$percent[cell_perc$condition=="Moderate"&  (cell_perc$celltypes=="RG" |cell_perc$celltypes=="t-RG"|cell_perc$celltypes=="NE")]), sum(cell_perc$percent[cell_perc$condition =="Severe"& (cell_perc$celltypes=="RG"|cell_perc$celltypes=="t-RG"|cell_perc$celltypes=="NE")]), sum(cell_perc$percent[cell_perc$condition=="Ctrl"& (cell_perc$celltypes =="dFB-N" |cell_perc$celltypes=="vFB-N"|cell_perc$celltypes=="MB-N"|cell_perc$celltypes=="IN"|cell_perc$celltypes=="G")]),sum(cell_perc$percent[cell_perc$condition=="Mild"& (cell_perc$celltypes=="dFB-N" |cell_perc$celltypes=="vFB-N"|cell_perc$celltypes=="MB-N"|cell_perc$celltypes=="IN"|cell_perc$celltypes=="G")]), sum(cell_perc$percent[cell_perc$condition=="Moderate"& (cell_perc$celltypes=="dFB-N" |cell_perc$celltypes=="vFB-N"|cell_perc$celltypes=="MB-N"|cell_perc$celltypes=="IN"|cell_perc$celltypes=="G")]),sum(cell_perc$percent[cell_perc$condition=="Severe"& (cell_perc$celltypes=="dFB-N" |cell_perc$celltypes=="vFB-N"|cell_perc$celltypes=="MB-N"|cell_perc$celltypes=="IN"|cell_perc$celltypes=="G")])))
 cell_prog$type <- factor(cell_prog$type, levels = c("Progenitor","Differentiated Cells"))
 
 df_bar_prog <- cell_perc[cell_perc$celltypes=="IP"|cell_perc$celltypes=="t-RG"|cell_perc$celltypes=="RG"|cell_perc$celltypes=="CyP"|cell_perc$celltypes=="NE",]
 
-bar_prog <- ggplot(df_bar_prog, aes(x=celltypes, y=percent, fill=samples, color=samples)) + ylim(0,1) +
+bar_prog <- ggplot(df_bar_prog, aes(x=celltypes, y=percent, fill=condition, color=condition)) + ylim(0,1) +
   geom_bar(stat="identity", color="black",position=position_dodge())+theme_classic()+
   labs(y="cells (%)") + scale_fill_manual(values=c()) + theme(text = element_text(size=18),axis.title.x=element_blank(), axis.text.y=element_text(size=18), legend.text = element_text(size=14), axis.ticks.x = element_blank(),legend.position = "bottom") + scale_fill_manual(values=c("gray93","gray68","gray43","gray23"), labels=c("control","mild","moderate","severe"))
 
-ggsave(bar_prog,filename ="/path/to/figures/SupFig3C_barplot_progenitor.pdf", width = 10, height=7)
+#ggsave(ggarrange(bar_cell,bar_prog,widths = c(0.4,0.6),common.legend = T),filename ="/path/to/figures/SupFig3C_barplot_progenitor.pdf", width = 10, height=7)
+
+ggsave(bar_prog,filename ="/path/to/figures/barplot_progenitor.pdf", width = 10, height=7)
 
 ```
 
@@ -134,7 +161,7 @@ p3 <- DotPlot(object = sc, features = genes,assay ="RNA", dot.scale = 5, cols = 
   theme(text=element_text(size = 12)) + 
   theme(aspect.ratio =0.5)
 
-ggsave("/path/to/figures/SupFig2B_DotPlot.png", p3, width= 10, height = 5, dpi=600)
+#ggsave("/path/to/figures/DotPlot.png", p3, width= 10, height = 5, dpi=600)
 ```
 
 
@@ -155,11 +182,35 @@ for (i in c("Mild","Moderate","Severe")){
 markers_cl <- FindMarkers(sc,ident.1 = paste0(i,"_progenitor"), ident.2 = "Ctrl_progenitor", min.pct = 0.25,assay = "RNA", log2threshold=0.5)
 head(markers_cl,100)
 
-write.csv(markers_cl, paste0("/path/to/DEresults/progenitor_",i,".csv"), row.names = T)
-
 }
 
-save(sc, file="/path/to/seurat_objects/LIS1_integrated_DE.rds")
+
+#compare moderate and mild
+markers_cl <- FindMarkers(sc,ident.1 = "Moderate_progenitor", ident.2 = "Mild_progenitor", min.pct = 0.25,assay = "RNA", log2threshold=0.5)
+write.csv(markers_cl, "/path/to/DEresults/progenitor_moderate_vs_mild.csv")
+
+#compare severe and mild
+markers_cl <- FindMarkers(sc,ident.1 = "Severe_progenitor", ident.2 = "Mild_progenitor", min.pct = 0.25,assay = "RNA", log2threshold=0.5)
+write.csv(markers_cl, "/path/to/DEresults/progenitor_severe_vs_mild.csv")
+
+#compare severe and moderate
+markers_cl <- FindMarkers(sc,ident.1 = "Severe_progenitor", ident.2 = "Moderate_progenitor", min.pct = 0.25,assay = "RNA", log2threshold=0.5)
+write.csv(markers_cl, "/path/to/DEresults/progenitor_severe_vs_moderate.csv")
+
+```
+
+
+```{r DEanalysis NE marker, warning=FALSE, message=FALSE, results='hide'}
+
+Idents(sc) <- "cell_types"
+
+DefaultAssay(sc) <- "RNA"
+
+markers_rg <- FindMarkers(sc,ident.1 = "NE", ident.2 = "RG", min.pct = 0.25,assay = "RNA", log2threshold=0.5)
+head(markers_rg,100)
+
+write.csv(markers_rg, "path/to/DEresults/NE_markers_vs_RG.csv", row.names = T)
+
 ```
 
 
@@ -172,19 +223,19 @@ mild_vs_ctrl <- read.csv("/path/to/DEresults/progenitor_mild.csv")
 mild_sig <- mild_vs_ctrl[mild_vs_ctrl$p_val_adj<0.05 & abs(mild_vs_ctrl$avg_log2FC)>0.5 ,]
 mild_sig <- mild_sig[mild_sig$pct.1 > 0.25 | mild_sig$pct.2 > 0.25, ]
 mild_top10 <- mild_sig$X[order(abs(mild_sig$avg_log2FC),decreasing = T)][c(1:10)]
-write.table(mild_sig, "/path/to/DEresults/progenitor_mild_significant.csv",row.names = F, quote = F,sep=",")
+#write.table(mild_sig, "/path/to/DEresults/progenitor_mild_significant.csv",row.names = F, quote = F,sep=",")
 
 moderate_vs_ctrl <- read.csv("/path/to/DEresults/progenitor_moderate.csv")
 moderate_sig <- moderate_vs_ctrl[moderate_vs_ctrl$p_val_adj<0.05 & abs(moderate_vs_ctrl$avg_log2FC)>0.5 ,]
 moderate_sig <- moderate_sig[moderate_sig$pct.1 > 0.25 | moderate_sig$pct.2 > 0.25, ]
-write.table(moderate_sig, "/path/to/DEresults/progenitor_moderate_significant.csv",row.names = F, quote = F,sep=",")
+#write.table(moderate_sig, "/path/to/DEresults/progenitor_moderate_significant.csv",row.names = F, quote = F,sep=",")
 moderate_top10 <- moderate_sig$X[order(abs(moderate_sig$avg_log2FC),decreasing = T)][c(1:10)]
 
 severe_vs_ctrl <- read.csv("/path/to/DEresults/progenitor_severe.csv")
 severe_sig <- severe_vs_ctrl[severe_vs_ctrl$p_val_adj<0.05 & abs(severe_vs_ctrl$avg_log2FC)>0.5 ,]
 severe_sig <- severe_sig[severe_sig$pct.1 > 0.25 | severe_sig$pct.2 > 0.25, ]
 severe_top10 <- severe_sig$X[order(abs(severe_sig$avg_log2FC),decreasing = T)][c(1:10)]
-write.table(severe_sig, "/path/to/DEresults/progenitor_severe_significant.csv",row.names = F, quote = F,sep=",")
+#write.table(severe_sig, "/path/to/DEresults/progenitor_severe_significant.csv",row.names = F, quote = F,sep=",")
 
 # Get list of DE genes that need to be included in the heatmap
 DE_genes <- c(mild_sig$X,moderate_sig$X,severe_sig$X)
@@ -229,21 +280,83 @@ library(colorRamp2)
 col_fun_rna = colorRamp2(c(0,0.25, 0.5,0.75, 1), c("#1B4D68","#28739C","#E4E4E4","#F7AB64","#C7361B"))
 col_fun_prot = colorRamp2(c(0,0.25, 0.5,0.75, 1), c("#003E65","#3A98CC","#E4E4E4","#F7AB64","#C7361B"))
 
-pdf("/path/to/figures/Fig2E_DEG_hm.pdf",width=3,height=3)
+#pdf("/path/to/figures/Fig2E_DEG_hm.pdf",width=3,height=3)
 Heatmap(hm_DEG,name="log2FC", col=col_fun_rna(seq(0,1,length=100)),show_row_dend=F,cluster_columns = FALSE,column_names_gp  = gpar(fontsize=8),column_names_rot = 45,heatmap_legend_param = list(title_gp = gpar(fontsize = 7),labels_gp=gpar(fontsize=6))) + rowAnnotation(link = anno_mark(at = which(rownames(hm_DEG)==lab), 
         labels = lab[lab !=""], padding = unit(1, "mm"),link_gp = gpar(lwd = 0.1) ,labels_gp = gpar(fontsize = 7)))
-dev.off()
+#dev.off()
 
-venn.diagram(x=list(mild_sig$X,moderate_sig$X,severe_sig$X), category.names = c("mild", "moderate", "severe"),  fill = c("#F7AB64","#C7361B","#880000"),fontfamily ="calibri",cat.fontfamily = "calibri", cex = 2, cat.cex = 1.3, "/path/to/figures/SupFig3D_venn.png")
+#venn.diagram(x=list(mild_sig$X,moderate_sig$X,severe_sig$X), category.names = c("mild", "moderate", "severe"),  fill = c("#F7AB64","#C7361B","#880000"),fontfamily ="calibri",cat.fontfamily = "calibri", cex = 2, cat.cex = 1.3, "/path/to/figures/venn.png")
 
 ```
 
+
+```{r Venn Diagram, warning=FALSE, results='hide'}
+mod_vs_mild <- read.csv("/path/to/DEresults/progenitor_moderate_vs_mild.csv")
+mod_vs_mild_sig <- mod_vs_mild[mod_vs_mild$p_val_adj<0.05 & abs(mod_vs_mild$avg_log2FC)>0.5 ,]
+mod_vs_mild_sig <- mod_vs_mild_sig[mod_vs_mild_sig$pct.1 > 0.25 | mod_vs_mild_sig$pct.2 > 0.25, ]
+write.table(mod_vs_mild_sig, "/path/to/DEresults/progenitor_moderate_vs_ mild_significant.csv",row.names = F, quote = F,sep=",")
+
+sev_vs_mild <- read.csv("/path/to/DEresults/progenitor_severe_vs_mild.csv")
+sev_vs_mild_sig <- sev_vs_mild[sev_vs_mild$p_val_adj<0.05 & abs(sev_vs_mild$avg_log2FC)>0.5 ,]
+sev_vs_mild_sig <- sev_vs_mild_sig[sev_vs_mild_sig$pct.1 > 0.25 | sev_vs_mild_sig$pct.2 > 0.25, ]
+write.table(sev_vs_mild_sig, "/path/to/DEresults/progenitor_severe_vs_ mild_significant.csv",row.names = F, quote = F,sep=",")
+
+sev_vs_mod <- read.csv("/path/to/DEresults/progenitor_severe_vs_moderate.csv")
+sev_vs_mod_sig <- sev_vs_mod[sev_vs_mod$p_val_adj<0.05 & abs(sev_vs_mod$avg_log2FC)>0.5 ,]
+sev_vs_mod_sig <- sev_vs_mod_sig[sev_vs_mod_sig$pct.1 > 0.25 | sev_vs_mod_sig$pct.2 > 0.25, ]
+write.table(sev_vs_mod_sig, "/path/to/DEresults/progenitor_severe_vs_ moderate_significant.csv",row.names = F, quote = F,sep=",")
+
+
+x <- list(
+  mild_ctrl = mild_sig$X, 
+  moderate_mild = mod_vs_mild_sig$X,
+  moderate_ctrl = moderate_sig$X, 
+  severe_ctrl = severe_sig$X,
+  severe_mild = sev_vs_mild_sig$X,
+  severe_moderate = sev_vs_mod_sig$X
+  )
+
+ihml <- Reduce(union,  x) 
+
+test <- cbind(ihml, ihml%in%mild_sig$X, ihml%in%mod_vs_mild_sig$X, ihml%in%moderate_sig$X, 
+              ihml%in%severe_sig$X, ihml%in%sev_vs_mild_sig$X,ihml%in%sev_vs_mod_sig$X)
+
+rownames(test) <- test[,1]
+test <- test[,-1]
+colnames(test) <- c("mild_vs_ctrl","moderate_vs_mild","moderate_vs_ctrl","severe_vs_ctrl","severe_vs_mild","severe_vs_moderate")
+test[test==TRUE]<-1
+test[test==FALSE]<-0
+
+test <- data.frame(test)
+test[,1] <- as.numeric(test[,1])
+test[,2] <- as.numeric(test[,2])
+test[,3] <- as.numeric(test[,3])
+test[,4] <- as.numeric(test[,4])
+test[,5] <- as.numeric(test[,5])
+test[,6] <- as.numeric(test[,6])
+
+testmat <- as.matrix(test)
+
+library(RColorBrewer)
+#coul <- colorRampPalette(c("#C7361B","#D0D0CF"))(2)
+coul <- colorRampPalette(c("#C7361B","#FCD8C1"))(2)
+
+png("/path/to/figures/all_genes.png", width = 4.50,height=6.9,units="in",res=1200)
+heatmap(testmat, scale="none",col=coul, Colv = NA, Rowv = NA)
+dev.off()
+
+colnames(df) <- c("mild_vs_ctrl","moderate_vs_mild","moderate_vs_ctrl","severe_ctrl","severe_mild","severe_moderate")
+write.table(df, "/path/to/DEresults/all_gene_list.csv",row.names = F, quote = F,sep=",")
+
+
+```
 
 - Figure S3D
 
 ## Violin plots GO terms 
 
 ```{r define function, warning=FALSE, results='hide'}
+library(AnnotationDbi)
 add_GO_perc <- function(data, GO_term){
   go_id = GOID(GOTERM[Term(GOTERM) == GO_term])
   allegs <- get(go_id, org.Hs.egGO2ALLEGS)
@@ -265,7 +378,7 @@ head(RG_tRG,100)
 
 RG_tRG$gene <- rownames(RG_tRG)
 
-write.table(RG_tRG, "/path/to/DEresults/RG_t-RG_marker.txt", row.names = F,sep=";",quote=F)
+#write.table(RG_tRG, "/path/to/DEresults/RG_t-RG_marker.txt", row.names = F,sep=";",quote=F)
 
 library(org.Hs.eg.db)
 hs <- org.Hs.eg.db
@@ -277,7 +390,7 @@ library(clusterProfiler)
 go.obj <- enrichGO(ann_RGtRG$ENTREZID,OrgDb = "org.Hs.eg.db",ont="BP")
 go.res <- go.obj@result
 
-write.table(go.res,"/path/to/DEresults/RG_t-RG_GO.txt", row.names = F,sep=";",quote=F)
+#write.table(go.res,"/path/to/DEresults/RG_t-RG_GO.txt", row.names = F,sep=";",quote=F)
 
 # Comparison only in Severe vs. Ctrl, cluster 3 = t-RG, cluster 0 = RG
 sc2 <- subset(sc, idents=c("Severe3","Ctrl0"))
@@ -303,10 +416,10 @@ for(i in GO_terms_no_space){
 }
 
 # p-values 
-wil_t$neuron.differentiation$p.value 
-wil_t$generation.of.neurons$p.value 
-wil_t$neuron.fate.commitment$p.value 
-wil_t$regulation.of.neuron.differentiation$p.value 
+wil_t$neuron.differentiation$p.value #2.520929e-15
+wil_t$generation.of.neurons$p.value #3.649961e-14
+wil_t$neuron.fate.commitment$p.value #3.625523e-61
+wil_t$regulation.of.neuron.differentiation$p.value #1.506357e-190
 
 plots[[1]] <- plots[[1]]+
   annotate("text", x=1.5, y=max(sc2[[GO_terms_no_space[1]]])+max(sc2[[GO_terms_no_space[1]]])*0.1, label="***", size=10)+
@@ -327,7 +440,85 @@ vln <- wrap_plots(plots, guides="collect", nrow=2)&
   ylab("Proportion of feature set")&
   scale_fill_manual(values=c("#CC5500","#880000"), labels=c("RG","t-RG"))
 
-ggsave("/path/to/Fig2D_VlnPlot.png", vln, width= 5, height = 5, dpi=600)
+ggsave("/path/to/figures/VlnPlot.png", vln, width= 5, height = 5, dpi=600)
+```
+
+
+```{r GO plots apoptosis, warning=FALSE, results='hide'}
+
+GO_terms_2 <- c("positive regulation of apoptotic process","glial cell apoptotic process","cell death")
+
+for(i in seq_along(GO_terms_2)){
+  sc <- add_GO_perc(sc, GO_terms_2[i])
+}
+
+
+titles <- c("positive regulation of apoptotic process","glial cell apoptotic process","cell death")
+GO_terms_no_space2 <- str_replace_all(GO_terms_2, " ", ".")
+
+FeaturePlot(sc, features = c("positive.regulation.of.apoptotic.process","glial.cell.apoptotic.process","cell.death"))
+
+replicates <- c("C1","C7","P1","P2","P3","P4","P5","P6")
+
+perc_tab <- data.frame(replicate = replicates,
+                       condition = c("control","control","mild","mild","moderate","moderate","severe","severe"),
+                       mean_apop = rep(0, times = 8),
+                       sd_apop = rep(0, times = 8),
+                       mean_glia = rep(0, times = 8),
+                       sd_glia = rep(0, times = 8),
+                       mean_celld = rep(0, times = 8),
+                       sd_celld = rep(0, times = 8))
+
+for (i in replicates) {
+  perc_tab[replicates==i,"mean_apop"] <- mean(sc@meta.data$positive.regulation.of.apoptotic.process[sc@meta.data$replicate==i],na.rm=T)
+  perc_tab[replicates==i,"sd_apop"] <-  sd(sc@meta.data$positive.regulation.of.apoptotic.process[sc@meta.data$replicate==i])
+  
+  perc_tab[replicates==i,"mean_glia"] <- mean(sc@meta.data$glial.cell.apoptotic.process[sc@meta.data$replicate==i])
+  perc_tab[replicates==i,"sd_glia"] <-  sd(sc@meta.data$glial.cell.apoptotic.process[sc@meta.data$replicate==i])
+  
+  perc_tab[replicates==i,"mean_celld"] <- mean(sc@meta.data$cell.death[sc@meta.data$replicate==i])
+  perc_tab[replicates==i,"sd_celld"] <-  sd(sc@meta.data$cell.death[sc@meta.data$replicate==i])
+}
+
+write.table(perc_tab,"/path/to/apo_table.csv", row.names = F, sep=",")
+
+
+apo1 <- FeaturePlot(sc, features = GO_terms_no_space2, ncol=1)
+ggsave("/path/to/figures/FigRev1_ApoPlot.png", apo1, width= 6.5, height = 15, dpi=600)
+
+#p_apop<-ggplot(perc_tab, aes(x=replicate, y=mean_apop, fill=condition)) +  
+#  geom_point()+ ggtitle("positive regulation of apoptotic process") +
+#  geom_errorbar(aes(ymin=mean_apop-sd_apop, ymax=mean_apop+sd_apop), width=.2, 
+#                position=position_dodge(0.05)) + theme_classic()
+
+p_apop<-ggplot(perc_tab, aes(x=replicate, y=mean_apop, fill=condition)) + 
+  geom_bar(position=position_dodge(), stat="identity", fill=c("gray93","gray93","gray68","gray68","gray43","gray43","gray23","gray23"),
+           colour='black') + ggtitle("positive regulation of apoptotic process") +
+  geom_errorbar(aes(ymin=mean_apop-sd_apop, ymax=mean_apop+sd_apop), width=.2) + theme_classic() +
+  theme(text = element_text(size = 20))+ylab("GO score apoptotic process") + xlab("")
+
+#p_celld<-ggplot(perc_tab, aes(x=replicate, y=mean_celld)) +  
+#  geom_point()+ ggtitle("cell death") +
+#  geom_errorbar(aes(ymin=mean_celld-sd_celld, ymax=mean_celld+sd_celld), width=.2, 
+#                position=position_dodge(0.05)) + theme_classic()
+
+p_celld<-ggplot(perc_tab, aes(x=replicate, y=mean_celld, fill=condition)) + 
+  geom_bar(position=position_dodge(), stat="identity", fill=c("gray93","gray93","gray68","gray68","gray43","gray43","gray23","gray23"),
+           colour='black') + ggtitle("cell death") +
+  geom_errorbar(aes(ymin=mean_celld-sd_celld, ymax=mean_celld+sd_celld), width=.2) + theme_classic()+
+  theme(text = element_text(size = 20))+ylab("GO score cell death") + xlab("")
+
+ggsave("/path/to/figures/ApoPlot2.png", ggarrange(p_apop, p_celld, ncol=1, common.legend = T, legend = "bottom"), width= 9, height = 8, dpi=600)
+
+
+m_apop <- lm(positive.regulation.of.apoptotic.process ~ condition, data = sc@meta.data)
+parameters::model_parameters(anova(m_apop)) #Cohens d = 0.08
+
+m_glia <- lm(glial.cell.apoptotic.process ~ condition, data = sc@meta.data)
+parameters::model_parameters(anova(m_glia)) #Cohens d = 0.037
+
+m_celld <- lm(cell.death ~ condition, data = sc@meta.data)
+parameters::model_parameters(anova(m_celld)) #Cohens d = 0.114
 ```
 
 
@@ -409,7 +600,7 @@ cluster1_log2FC <- cluster1_log2FC[order(rownames(cluster1_log2FC)),]
 cluster1_p <- cluster1_p[order(rownames(cluster1_p)),]
 
 # Plot heatmap
-png("/path/to/figures/Fig4L_Wnt_CyP.png", width = 300,height=700)
+png("/path/to/figures/Wnt_CyP.png", width = 300,height=700)
 pheatmap(cluster1_log2FC, breaks=seq(-1.5, 1.5, length.out=100),color=col_fun_rna(seq(0,1,length=100)),cluster_rows = F,cluster_cols = F,fontsize = 16,display_numbers = cluster1_p, cellwidth = 20,cellheight = 20)
 dev.off()
 ```

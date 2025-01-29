@@ -3,9 +3,9 @@ library(ggplot2)
 library(forcats)
 library(data.table)
 
-# Mild
+#### Mild ####
 
-mi_query_result <- fread("/zi-flstorage/group_genepi/shared-scRNAseq/1_Projekt_Andrea/drug_repurposing/CMap/Mild/arfs/TAG/query_result.gct",skip=2)
+mi_query_result <- fread("/path/to/drug_repurposing/CMap/Mild/query_result.gct",skip=2)
 mi_query_result <-mi_query_result[-1,]
 #-log10(0.05) -> 1.30103
 
@@ -14,7 +14,7 @@ mi_neg_corr_perturbagens <- mi_query_result_sig[order(as.numeric(mi_query_result
 
 # GSEA results
 
-mi_gsea_result <- fread("/zi-flstorage/group_genepi/shared-scRNAseq/1_Projekt_Andrea/drug_repurposing/CMap/Mild/gsea/TAG/arfs/NORM_CS/gsea_result.gct",skip=2)
+mi_gsea_result <- fread("/path/to/drug_repurposing/CMap/gsea_result.gct",skip=2)
 mi_gsea_result <- mi_gsea_result[-1,]
 
 mi_gsea_result_sig_MOA <- mi_gsea_result[mi_gsea_result$set_type == "MOA_CLASS",]
@@ -34,15 +34,15 @@ mi_neg_corr_gsea_MOA$name <- gsub("*_$","",mi_neg_corr_gsea_MOA$name)
 # PCL
 
 mi_neg_corr_gsea_PCL <- mi_gsea_result_sig_PCL[order(as.numeric(mi_gsea_result_sig_PCL$norm_cs),decreasing = F),]
-mi_neg_corr_gsea_PCL$src_set_id <- gsub("^...","",neg_corr_gsea_PCL$src_set_id)
+mi_neg_corr_gsea_PCL$src_set_id <- gsub("^...","",mi_neg_corr_gsea_PCL$src_set_id)
 mi_neg_corr_gsea_PCL$cell_iname[mi_neg_corr_gsea_PCL$cell_iname=="-666"]<-""
 mi_neg_corr_gsea_PCL$name <- paste0(mi_neg_corr_gsea_PCL$src_set_id,"_",mi_neg_corr_gsea_PCL$cell_iname)
 mi_neg_corr_gsea_PCL$name <- gsub("*_$","",mi_neg_corr_gsea_PCL$name)
 
-# Moderate
+####  Moderate ####
 # Individual perturbagens 
 
-m_query_result <- fread("/zi-flstorage/group_genepi/shared-scRNAseq/1_Projekt_Andrea/drug_repurposing/CMap/Moderate/arfs/TAG/query_result.gct",skip=2)
+m_query_result <- fread("/path/to/drug_repurposing/CMap/query_result.gct",skip=2)
 m_query_result <-m_query_result[-1,]
 #-log10(0.05) -> 1.30103
 
@@ -52,7 +52,7 @@ m_neg_corr_perturbagens <- m_query_result_sig[order(as.numeric(m_query_result_si
 
 # GSEA results
 
-m_gsea_result <- fread("/zi-flstorage/group_genepi/shared-scRNAseq/1_Projekt_Andrea/drug_repurposing/CMap/Moderate/gsea/TAG/arfs/NORM_CS/gsea_result.gct",skip=2)
+m_gsea_result <- fread("/path/to/drug_repurposing/CMap/gsea_result.gct",skip=2)
 m_gsea_result <- m_gsea_result[-1,]
 
 m_gsea_result_sig_MOA <- m_gsea_result[m_gsea_result$set_type == "MOA_CLASS",]
@@ -73,18 +73,18 @@ m_neg_corr_gsea_PCL$cell_iname[m_neg_corr_gsea_PCL$cell_iname=="-666"]<-""
 m_neg_corr_gsea_PCL$name <- paste0(m_neg_corr_gsea_PCL$src_set_id,"_",m_neg_corr_gsea_PCL$cell_iname)
 m_neg_corr_gsea_PCL$name <- gsub("*_$","",m_neg_corr_gsea_PCL$name)
 
-# Severe 
+#### Severe #### 
 
 # Individual perturbagens 
 
-query_result <- fread("/zi-flstorage/group_genepi/shared-scRNAseq/1_Projekt_Andrea/drug_repurposing/CMap/Severe/arfs/TAG/query_result.gct",skip=2)
+query_result <- fread("/path/to/drug_repurposing/CMap/query_result.gct",skip=2)
 query_result <-query_result[-1,]
 #-log10(0.05) -> 1.30103
 
 query_result_sig <-query_result[abs(as.numeric(query_result$fdr_q_nlog10)) > 1.30103,]
 neg_corr_perturbagens <- query_result_sig[order(as.numeric(query_result_sig$norm_cs),decreasing = F),]
 
-gsea_result <- fread("/zi-flstorage/group_genepi/shared-scRNAseq/1_Projekt_Andrea/drug_repurposing/CMap/Severe/gsea/TAG/arfs/NORM_CS/gsea_result.gct",skip=2)
+gsea_result <- fread("/path/to/drug_repurposing/CMap/gsea_result.gct",skip=2)
 gsea_result <- gsea_result[-1,]
 gsea_result_sig_MOA <- gsea_result[gsea_result$set_type == "MOA_CLASS",]
 gsea_result_sig_MOA <- gsea_result_sig_MOA[order(gsea_result_sig_MOA$fdr_q_nlog10,decreasing=T),]
@@ -165,10 +165,11 @@ for(i in pert_1_df$compound){
 pert_1_df <- pert_1_df[order(pert_1_df$score,decreasing = F),]
 pert_1_df$compound <- factor(pert_1_df$compound,levels=rev(unique(pert_1_df$compound)))
 
-p1 <- ggplot(pert_1_df, aes(fill=condition, y=cscore_norm, x=compound,label=pval)) + coord_flip()+
+p1 <- ggplot(pert_1_df, aes(fill=condition, y=cscore_norm, x=compound,label=pval)) + #coord_flip()+
   geom_bar(position="dodge", stat="identity")+ labs(x="", y="Normalized connectivity score",
-                                                    title="",legend="sig")+geom_text(aes(label=pval,group=condition),position=position_dodge(width=0.9),hjust=1.5,vjust=0.7)+scale_fill_manual(values=c("#880000","#C7361B","#F7AB64")) +theme_minimal() + theme(axis.text = element_text(size=14),legend.text=element_text(size=12))
-ggsave("/zi-flstorage/group_genepi/shared-scRNAseq/1_Projekt_Andrea/drug_repurposing/CMap/Combined_perturbagen.pdf",p1,height=8,width=8)
+                                                    title="",legend="sig")+geom_text(aes(label=pval,group=condition),position=position_dodge(width=0.9),vjust=1.7)+scale_fill_manual(values=c("#880000","#C7361B","#F7AB64")) +
+  theme_minimal() + theme(axis.text = element_text(size=12, angle=50),legend.text=element_text(size=12)) +ylim(-2,0) + scale_x_discrete(labels=c("TGFBR2", "PTK2","NR1H2","GPRC5B","MAP3K4","ERGIC2","RIOK3","ZNF32","everolimus"))
+ggsave("/path/to/drug_repurposing/CMap/Combined_perturbagen.pdf",p1,height=4.5,width=8)
 
 
 # GSEA MOA
@@ -228,10 +229,11 @@ pert_2_df$condition <- factor(pert_2_df$condition,levels=c("SEVERE","MODERATE","
 unique(pert_2_df$term[c(1:12)])
 pert_2_df2 <- pert_2_df[pert_2_df$term %in% unique(pert_2_df$term[c(1:12)]),]
 
-p2 <- ggplot(pert_2_df2, aes(fill=condition, y=cscore_norm, x=term,label=pval)) + coord_flip()+
+p2 <- ggplot(pert_2_df2, aes(fill=condition, y=cscore_norm, x=term,label=pval)) + #()+
   geom_bar(position="dodge", stat="identity")+ylim(-2.5,1.5) +labs(x="", y="Normalized connectivity score",
-                                                    title="",legend="sig")+geom_text(aes(label=pval,group=condition),position=position_dodge(width=0.9),hjust=1.5,vjust=0.7)+scale_fill_manual(values=c("#880000","#C7361B","#F7AB64")) +theme_minimal() + theme(axis.text = element_text(size=14),legend.text=element_text(size=12))
-ggsave("/zi-flstorage/group_genepi/shared-scRNAseq/1_Projekt_Andrea/drug_repurposing/CMap/MOA_Severe_Moderate.pdf",p2,height=8,width=8)
+                                                    title="",legend="sig")+geom_text(aes(label=pval,group=condition),position=position_dodge(width=0.9),vjust=1.7)+scale_fill_manual(values=c("#880000","#C7361B","#F7AB64")) +
+  theme_minimal() + theme(axis.text = element_text(size=10, angle=50, hjust = 0.85),legend.text=element_text(size=12))
+ggsave("/path/to/drug_repurposing/CMap/MOA_Severe_Moderate.pdf",p2,height=5,width=8)
 
 # all within the same direction
 pert_3 <- pert2[ pert2$cscore_norm_MODERATE<0 & pert2$cscore_norm_SEVERE<0 & pert2$cscore_norm_MILD<0,]
@@ -258,5 +260,5 @@ pert_3_df2 <- pert_3_df[pert_3_df$term %in% unique(pert_3_df$term[c(1:10)]),]
 p3 <- ggplot(pert_3_df2, aes(fill=condition, y=cscore_norm, x=term,label=pval)) + coord_flip()+
   geom_bar(position="dodge", stat="identity")+ylim(-2,0) +labs(x="", y="Normalized connectivity score",
                                                                    title="",legend="sig")+geom_text(aes(label=pval,group=condition),position=position_dodge(width=0.9),hjust=1.5,vjust=0.7)+scale_fill_manual(values=c("#880000","#C7361B","#F7AB64")) +theme_minimal() + theme(axis.text = element_text(size=14),legend.text=element_text(size=12))
-ggsave("/zi-flstorage/group_genepi/shared-scRNAseq/1_Projekt_Andrea/drug_repurposing/CMap/MOA_Mild_AND_Severe_Moderate.pdf",p3,height=8,width=8)
+ggsave("/path/to/drug_repurposing/CMap/CMap/MOA_Mild_AND_Severe_Moderate.pdf",p3,height=8,width=8)
 
