@@ -72,7 +72,7 @@ p3 <- FeaturePlot(sc, features=c("ZBTB16", "MMRN1","NR2F1","BTBD17"))
 p3
 ```
 
-- Figure 2C
+- Figure 1H
 
 ```{r celltypes stacked}
 samples <- c(rep("Ctrl_C1" , 10),rep("Ctrl_C7" , 10) , rep("Mild_P1" , 10), rep("Mild_P2" , 10), rep("Moderate_P3" , 10), rep("Moderate_P4" , 10), rep("Severe_P5" , 10), rep("Severe_P6" , 10))
@@ -99,9 +99,9 @@ ggsave(plot = per,filename ="/path/to/figures/celltype_percentage_revision.pdf",
 
 
 
-## Supplementary Figures 3C
+## Supplementary Figures 3B
 
-```{r sut-RG fig 3c 3d, warning=FALSE, message=FALSE, results='hide'}
+```{r sut-RG fig 3b 3d, warning=FALSE, message=FALSE, results='hide'}
 condition <- c(rep("Ctrl" , 10),rep("Mild" , 10),rep("Moderate" , 10), rep("Severe" , 10))
 
 celltypes <- rep(names(table(sc$cell_types)) , 4)
@@ -131,13 +131,13 @@ bar_prog <- ggplot(df_bar_prog, aes(x=celltypes, y=percent, fill=condition, colo
   geom_bar(stat="identity", color="black",position=position_dodge())+theme_classic()+
   labs(y="cells (%)") + scale_fill_manual(values=c()) + theme(text = element_text(size=18),axis.title.x=element_blank(), axis.text.y=element_text(size=18), legend.text = element_text(size=14), axis.ticks.x = element_blank(),legend.position = "bottom") + scale_fill_manual(values=c("gray93","gray68","gray43","gray23"), labels=c("control","mild","moderate","severe"))
 
-#ggsave(ggarrange(bar_cell,bar_prog,widths = c(0.4,0.6),common.legend = T),filename ="/path/to/figures/SupFig3C_barplot_progenitor.pdf", width = 10, height=7)
+#ggsave(ggarrange(bar_cell,bar_prog,widths = c(0.4,0.6),common.legend = T),filename ="/path/to/figures/SupFig3B_barplot_progenitor.pdf", width = 10, height=7)
 
 ggsave(bar_prog,filename ="/path/to/figures/barplot_progenitor.pdf", width = 10, height=7)
 
 ```
 
-- Supplement Figure S2B
+- Supplement Figure S3A
 ```{r dotplot markers}
 genes <- c("TOP2A","TPX2","MKI67","CTNNB1","CDH2", "FABP7", "HES1","HES4","HES5", "SOX2", "SOX4", "VIM", "NES", "ANXA5", "PTPRZ1", "FABP5","C1orf61", "OTX2", "PAX6", "EMX2", "SFRP1", "NEUROD1","EOMES",  "ELAVL4", "TBR1", "STMN1", "DCX", "MAP2", "DLX1", "DLX2", "SLC32A1", "ARX", "SST", "ROBO2", "LMX1B","EN1", "EN2", "MOXD1", "S100B")
 
@@ -214,7 +214,7 @@ write.csv(markers_rg, "path/to/DEresults/NE_markers_vs_RG.csv", row.names = T)
 ```
 
 
-# Heatmap of DE genes across clusters - Figure 2D
+# Heatmap of DE genes across clusters - Figure 2E
 
 ```{r hm_GEX,warning=FALSE, message=FALSE, results='hide'}
 # Import DE results - log2FC 0.5 cutoff and padj 0.05, only celltypes with more than 100 cells from each condition
@@ -351,7 +351,7 @@ write.table(df, "/path/to/DEresults/all_gene_list.csv",row.names = F, quote = F,
 
 ```
 
-- Figure S3D
+- Figure 3D
 
 ## Violin plots GO terms 
 
@@ -397,7 +397,7 @@ sc2 <- subset(sc, idents=c("Severe3","Ctrl0"))
 Idents(sc2) <- "cell_types"
 ```
 
-## RG and t-RG clusters - neurogenesis-related terms - Figure 2D
+## RG and t-RG clusters - neurogenesis-related terms - Figure 3D
 ```{r GO plots, warning=FALSE, results='hide'}
 GO_terms <- c("neuron differentiation","neuron fate commitment","regulation of neuron differentiation","epithelial tube formation")
 
@@ -531,7 +531,7 @@ Idents(sc3) <- "condition"
 ```
 
 
-- Figure 4L
+- Figure 3G
 
 # WNT gene heatmap in CyP cluster 
 
